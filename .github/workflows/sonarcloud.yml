@@ -36,7 +36,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  pull-requests: read # allows SonarCloud to decorate PRs with analysis results
+  contents: read
+  pull-requests: write 
+  security-events: write
 
 jobs:
   Analysis:
@@ -64,15 +66,6 @@ jobs:
         run: ./gradlew test jacocoTestReport
 
       - name: Analyze with SonarCloud
-        uses: SonarSource/sonarcloud-github-action@v2.2.0
+        run: ./gradlew sonar
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_AUTH }}
-        with:
-          args:
-            -Dsonar.projectKey=advprog-2026-A12-project_MySawit-AUTH
-            -Dsonar.organization=advprog-2026-a12-project
-            -Dsonar.java.binaries=build/classes
-            -Dsonar.sources=src/main/java
-            -Dsonar.tests=src/test/java
-            -Dsonar.coverage.jacoco.xmlReportPaths=build/reports/jacoco/test/jacocoTestReport.xml
-          projectBaseDir: .
