@@ -44,12 +44,22 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
-    runtimeOnly("org.postgresql:postgresql")
-    annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     annotationProcessor("org.projectlombok:lombok")
     testImplementation("org.springframework.boot:spring-boot-starter-thymeleaf-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    //ini buat connect ke database
+    runtimeOnly("org.postgresql:postgresql")
+    runtimeOnly("com.h2database:h2")
+    annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
+
+    //ini buat migrate/init databasenya 
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-database-postgresql")
+
+
 }
 
 tasks.withType<Test> {
