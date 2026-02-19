@@ -5,7 +5,7 @@ plugins {
     jacoco
     id("org.springframework.boot") version "4.0.2"
     id("io.spring.dependency-management") version "1.1.7"
-    id("org.sonarqube") version "6.0.1.5171"
+    id("org.sonarqube") version "7.2.2.6593"
 }
 
 group = "id.ac.ui.cs.advprog"
@@ -18,7 +18,7 @@ java {
     }
 }
 
-sonarqube {
+sonar {
     properties {
         property("sonar.projectKey", "advprog-2026-A12-project_MySawit-AUTH")
         property("sonar.organization", "advprog-2026-a12-project")
