@@ -26,7 +26,7 @@
 # Feel free to take a look at our documentation (https://docs.sonarcloud.io/getting-started/github/)
 # or reach out to our community forum if you need some help (https://community.sonarsource.com/c/help/sc/9)
 
-name: SonarCloud analysis
+name: Deployment
 
 on:
   push:
@@ -69,3 +69,16 @@ jobs:
         run: ./gradlew sonar
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_AUTH }}
+
+  deploy:
+    needs: Analysis
+    runs-on: ubuntu-latest
+    if: needs.Analysis.result == 'success' && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
+    steps:
+      - name: Deploy to Staging
+        if: github.ref == 'refs/heads/staging'
+        run: echo "Deploying to STAGING environment..."
+
+      - name: Deploy to Production
+        if: github.ref == 'refs/heads/main'
+        run: echo "Deploying to PRODUCTION environment..."
