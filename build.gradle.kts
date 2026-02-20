@@ -60,6 +60,9 @@ dependencies {
     //ini buat connect ke database
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("com.h2database:h2")
+
+    //load env
+    implementation("me.paulschwarz:spring-dotenv:4.0.0")
 }
 
 
