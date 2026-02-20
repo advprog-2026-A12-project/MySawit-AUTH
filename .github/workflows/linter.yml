@@ -1,0 +1,38 @@
+name: Linter
+
+on:
+  push:
+    branches: [ "main", "staging", "feat/**" ]
+  pull_request:
+    branches: [ "main", "staging", "feat/**" ]
+
+permissions: { }
+
+jobs:
+  build:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: read
+      issues: write
+      pull-requests: write
+      statuses: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Super-linter
+        uses: super-linter/super-linter@v8.5.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_ALL_CODEBASE: false
+          VALIDATE_JAVA: true
+          FILTER_REGEX_INCLUDE: '.*\.java$'
+          LINTER_RULES_PATH: config/checkstyle
+          JAVA_FILE_NAME: 'google_checks.xml'
