@@ -44,3 +44,7 @@ out/
 .env.local
 .env.dev
 .env.prod
+
+
+api-docs-container1-auth.md
+database-design.md

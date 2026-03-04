@@ -15,13 +15,13 @@ class UserModelTest {
         user.setEmail("user1@mail.com");
         user.setName("User One");
         user.setPassword("secret");
-        user.setRole(UserRole.SUPIR);
+        user.setRole(UserRole.SUPIR_TRUK);
 
         assertEquals(1L, user.getId());
         assertEquals("user1", user.getUsername());
         assertEquals("user1@mail.com", user.getEmail());
         assertEquals("User One", user.getName());
         assertEquals("secret", user.getPassword());
-        assertEquals(UserRole.SUPIR, user.getRole());
+        assertEquals(UserRole.SUPIR_TRUK, user.getRole());
     }
 }

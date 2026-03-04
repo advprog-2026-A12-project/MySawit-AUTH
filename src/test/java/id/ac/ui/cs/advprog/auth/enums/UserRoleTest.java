@@ -10,16 +10,16 @@ class UserRoleTest {
     @Test
     void enumValuesAreExpected() {
         assertArrayEquals(
-            new UserRole[] {UserRole.ADMIN, UserRole.ADMIN, UserRole.ADMIN, UserRole.SUPIR},
+            new UserRole[] {UserRole.ADMIN, UserRole.BURUH, UserRole.MANDOR, UserRole.SUPIR_TRUK},
             UserRole.values()
         );
     }
 
     @Test
     void valueOfWorks() {
-        assertEquals(UserRole.ADMIN, UserRole.valueOf("Admin"));
-        assertEquals(UserRole.BURUH, UserRole.valueOf("Buruh"));
-        assertEquals(UserRole.MANDOR, UserRole.valueOf("Mandor"));
-        assertEquals(UserRole.SUPIR, UserRole.valueOf("Supir"));
+        assertEquals(UserRole.ADMIN, UserRole.valueOf("ADMIN"));
+        assertEquals(UserRole.BURUH, UserRole.valueOf("BURUH"));
+        assertEquals(UserRole.MANDOR, UserRole.valueOf("MANDOR"));
+        assertEquals(UserRole.SUPIR_TRUK, UserRole.valueOf("SUPIR_TRUK"));
     }
 }

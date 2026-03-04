@@ -4,5 +4,5 @@ public enum UserRole {
     ADMIN,
     BURUH,
     MANDOR,
-    SUPIR
+    SUPIR_TRUK
 }
