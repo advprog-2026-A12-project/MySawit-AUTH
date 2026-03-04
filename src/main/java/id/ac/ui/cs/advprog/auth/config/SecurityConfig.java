@@ -37,10 +37,12 @@ public class SecurityConfig {
                     auth.requestMatchers(
                             "/api/v1/auth/register",
                             "/api/v1/auth/login",
-                            "/api/v1/auth/refresh"
+                            "/api/v1/auth/refresh",
+                            "/h2-console/**"
                     ).permitAll();
                     auth.anyRequest().authenticated();
                 })
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

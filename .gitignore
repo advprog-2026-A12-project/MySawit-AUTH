@@ -38,6 +38,7 @@ out/
 .vscode/
 
 .data
+data/
 
 # Local environment variables
 .env
