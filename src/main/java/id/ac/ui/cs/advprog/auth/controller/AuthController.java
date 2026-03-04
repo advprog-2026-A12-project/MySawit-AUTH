@@ -26,23 +26,20 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<BaseResponse<RegisterResponseData>> register(
-            @Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<BaseResponse<RegisterResponseData>> register(@Valid @RequestBody RegisterRequest request) {
         RegisterResponseData data = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(BaseResponse.success("Registration successful", data));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<BaseResponse<LoginResponseData>> login(
-            @Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<BaseResponse<LoginResponseData>> login(@Valid @RequestBody LoginRequest request) {
         LoginResponseData data = authService.login(request);
         return ResponseEntity.ok(BaseResponse.success("Login successful", data));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<BaseResponse<Void>> logout(
-            @Valid @RequestBody LogoutRequest request) {
+    public ResponseEntity<BaseResponse<Void>> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
         return ResponseEntity.ok(BaseResponse.success("Logout successful"));
     }

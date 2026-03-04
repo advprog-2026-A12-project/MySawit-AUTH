@@ -15,5 +15,4 @@ public class LoginResponseData {
     private String refreshToken;
     private String tokenType;
     private int expiresIn;
-    private LoginUserDto user;
 }

@@ -108,7 +108,6 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(rawRefreshToken)
                 .tokenType("Bearer")
                 .expiresIn((int) jwtService.getAccessTokenExpiration())
-                .user(userDto)
                 .build();
     }
 
@@ -133,7 +132,6 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new InvalidTokenException("Refresh token not found"));
 
         if (storedToken.isRevoked()) {
-            // Potential token reuse attack — revoke all tokens for this user
             refreshTokenRepository.revokeAllByUser(storedToken.getUser());
             throw new InvalidTokenException("Refresh token has been revoked");
         }
