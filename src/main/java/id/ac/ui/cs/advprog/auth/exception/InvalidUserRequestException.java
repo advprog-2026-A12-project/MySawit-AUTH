@@ -1,7 +1,13 @@
 package id.ac.ui.cs.advprog.auth.exception;
 
-public class InvalidUserRequestException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+/**
+ * 400 — Bad request / validation failure.
+ */
+public class InvalidUserRequestException extends BaseException {
+
     public InvalidUserRequestException(String message) {
-        super(message);
+        super(HttpStatus.BAD_REQUEST, message);
     }
 }

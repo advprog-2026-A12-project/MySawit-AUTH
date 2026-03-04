@@ -38,9 +38,14 @@ out/
 .vscode/
 
 .data
+data/
 
 # Local environment variables
 .env
 .env.local
 .env.dev
 .env.prod
+
+
+api-docs-container1-auth.md
+database-design.md
