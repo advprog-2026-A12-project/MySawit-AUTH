@@ -4,11 +4,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import id.ac.ui.cs.advprog.auth.config.SecurityConfig;
 import id.ac.ui.cs.advprog.auth.dto.request.LoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.LogoutRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.RefreshTokenRequest;
@@ -27,20 +33,20 @@ import java.util.UUID;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(AuthController.class)
+@Import(SecurityConfig.class)
 class AuthControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @MockitoBean
     private AuthService authService;
@@ -179,7 +185,6 @@ class AuthControllerTest {
     class LogoutTests {
 
         @Test
-        @WithMockUser
         void logoutReturns200OnSuccess() throws Exception {
             LogoutRequest request = LogoutRequest.builder()
                     .refreshToken("some-refresh-token")
@@ -188,6 +193,7 @@ class AuthControllerTest {
             doNothing().when(authService).logout(any(LogoutRequest.class));
 
             mockMvc.perform(post("/api/v1/auth/logout")
+                            .with(user("testuser").roles("BURUH"))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk())

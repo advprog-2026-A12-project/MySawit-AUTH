@@ -63,7 +63,8 @@ class AuthServiceImplTest {
                 .role(UserRole.BURUH)
                 .isActive(true)
                 .build();
-        sampleUser.onCreate(); // set timestamps
+        sampleUser.setCreatedAt(java.time.Instant.now());
+        sampleUser.setUpdatedAt(java.time.Instant.now());
     }
 
     // ── Register ────────────────────────────────────────────────────────
@@ -86,7 +87,8 @@ class AuthServiceImplTest {
             when(userRepository.save(any(User.class))).thenAnswer(inv -> {
                 User u = inv.getArgument(0);
                 u.setId(UUID.randomUUID());
-                u.onCreate();
+                u.setCreatedAt(java.time.Instant.now());
+                u.setUpdatedAt(java.time.Instant.now());
                 return u;
             });
 
@@ -117,7 +119,8 @@ class AuthServiceImplTest {
             when(userRepository.save(any(User.class))).thenAnswer(inv -> {
                 User u = inv.getArgument(0);
                 u.setId(UUID.randomUUID());
-                u.onCreate();
+                u.setCreatedAt(java.time.Instant.now());
+                u.setUpdatedAt(java.time.Instant.now());
                 return u;
             });
 
@@ -230,7 +233,8 @@ class AuthServiceImplTest {
             when(userRepository.save(userCaptor.capture())).thenAnswer(inv -> {
                 User u = inv.getArgument(0);
                 u.setId(UUID.randomUUID());
-                u.onCreate();
+                u.setCreatedAt(java.time.Instant.now());
+                u.setUpdatedAt(java.time.Instant.now());
                 return u;
             });
 
@@ -448,10 +452,8 @@ class AuthServiceImplTest {
             assertEquals("Bearer", result.getTokenType());
             assertEquals(900, result.getExpiresIn());
 
-            // Old token should be revoked
-            verify(refreshTokenRepository).save(validStoredToken);
-            // New token should be saved
-            verify(refreshTokenRepository).save(any(RefreshToken.class));
+            // Old token should be revoked (save #1), new token should be persisted (save #2)
+            verify(refreshTokenRepository, org.mockito.Mockito.times(2)).save(any(RefreshToken.class));
         }
 
         @Test

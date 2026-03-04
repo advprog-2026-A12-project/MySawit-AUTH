@@ -9,9 +9,7 @@ import static org.mockito.Mockito.when;
 
 import id.ac.ui.cs.advprog.auth.service.JwtService;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.impl.DefaultClaims;
 import jakarta.servlet.FilterChain;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +25,7 @@ class JwtAuthenticationFilterTest {
 
     @Mock private JwtService jwtService;
     @Mock private FilterChain filterChain;
+    @Mock private Claims claims;
 
     private JwtAuthenticationFilter filter;
 
@@ -80,12 +79,8 @@ class JwtAuthenticationFilterTest {
         request.addHeader("Authorization", "Bearer valid-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        Claims claims = new DefaultClaims(Map.of(
-                "sub", userId.toString(),
-                "role", "BURUH",
-                "email", "test@mail.com",
-                "name", "Test"
-        ));
+        when(claims.getSubject()).thenReturn(userId.toString());
+        when(claims.get("role", String.class)).thenReturn("BURUH");
 
         when(jwtService.isTokenValid("valid-token")).thenReturn(true);
         when(jwtService.extractAllClaims("valid-token")).thenReturn(claims);
