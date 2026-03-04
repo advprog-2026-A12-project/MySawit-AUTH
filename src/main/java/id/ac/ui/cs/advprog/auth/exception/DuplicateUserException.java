@@ -1,7 +1,13 @@
 package id.ac.ui.cs.advprog.auth.exception;
 
-public class DuplicateUserException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+/**
+ * 409 — Duplicate data conflict (e.g. email/username already registered).
+ */
+public class DuplicateUserException extends BaseException {
+
     public DuplicateUserException(String field) {
-        super(field + " already exists");
+        super(HttpStatus.CONFLICT, field + " already exists");
     }
 }

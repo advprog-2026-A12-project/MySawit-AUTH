@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    container_name: auth-app
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      APP_PROFILE: local
+      SERVER_PORT: 8001

@@ -1,29 +1,49 @@
 package id.ac.ui.cs.advprog.auth.exception;
 
-import java.time.Instant;
+import id.ac.ui.cs.advprog.auth.dto.response.BaseResponse;
+import id.ac.ui.cs.advprog.auth.dto.response.FieldErrorDto;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleUserNotFound(UserNotFoundException ex) {
-        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+
+    /**
+     * Handles all application exceptions that extend BaseException.
+     * The HTTP status is carried by the exception itself.
+     */
+    @ExceptionHandler(BaseException.class)
+    public ResponseEntity<BaseResponse<Void>> handleBaseException(BaseException ex) {
+        BaseResponse<Void> body = BaseResponse.error(ex.getMessage());
+        return ResponseEntity.status(ex.getHttpStatus()).body(body);
     }
 
-    @ExceptionHandler(DuplicateUserException.class)
-    public ResponseEntity<ApiErrorResponse> handleDuplicateUser(DuplicateUserException ex) {
-        return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
+    /**
+     * Handles Jakarta Bean Validation errors triggered by @Valid.
+     * Returns 400 with per-field error details.
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<BaseResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
+        List<FieldErrorDto> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> FieldErrorDto.builder()
+                        .field(fe.getField())
+                        .message(fe.getDefaultMessage())
+                        .build())
+                .toList();
+        BaseResponse<Void> body = BaseResponse.error("Validation failed", fieldErrors);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
-    @ExceptionHandler(InvalidUserRequestException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidRequest(InvalidUserRequestException ex) {
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
-    }
-
-    private ResponseEntity<ApiErrorResponse> buildResponse(HttpStatus status, String message) {
-        return ResponseEntity.status(status).body(new ApiErrorResponse(message, status.value(), Instant.now()));
+    /**
+     * Catch-all for any unexpected exception.
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<BaseResponse<Void>> handleGeneral(Exception ex) {
+        BaseResponse<Void> body = BaseResponse.error("Internal server error");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 }
