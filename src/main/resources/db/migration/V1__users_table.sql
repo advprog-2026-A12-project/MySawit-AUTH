@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT uq_users_username UNIQUE (username),
     CONSTRAINT uq_users_email UNIQUE (email),
     CONSTRAINT uq_users_mandor_cert UNIQUE (mandor_certification_number),
-    CONSTRAINT chk_users_role CHECK (role IN ('ADMIN', 'BURUH', 'MANDOR', 'SUPIR')),
+    CONSTRAINT chk_users_role CHECK (role IN ('ADMIN', 'BURUH', 'MANDOR', 'SUPIR_TRUK')),
     CONSTRAINT chk_mandor_cert CHECK (
         (role != 'MANDOR') OR (mandor_certification_number IS NOT NULL)
     ),
