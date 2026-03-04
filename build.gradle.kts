@@ -63,6 +63,9 @@ dependencies {
 
     //load env
     implementation("me.paulschwarz:spring-dotenv:4.0.0")
+
+    //validation constrain
+    implementation("org.springframework.boot:spring-boot-starter-validation")
 }
 
 

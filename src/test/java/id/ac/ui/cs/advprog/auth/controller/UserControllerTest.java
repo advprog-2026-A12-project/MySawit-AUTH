@@ -33,8 +33,8 @@ class UserControllerTest {
 
     @BeforeEach
     void setUp() {
-        request = new UserRequest("andi", "andi@mail.com", "Andi", "pw", UserRole.Admin);
-        response = new UserResponse(1L, "andi", "andi@mail.com", "Andi", UserRole.Admin);
+        request = new UserRequest("andi", "andi@mail.com", "Andi", "pw", UserRole.ADMIN);
+        response = new UserResponse(1L, "andi", "andi@mail.com", "Andi", UserRole.ADMIN);
     }
 
     @Test

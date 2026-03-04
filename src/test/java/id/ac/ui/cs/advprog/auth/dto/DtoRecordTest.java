@@ -12,24 +12,24 @@ class DtoRecordTest {
 
     @Test
     void userRequestRecordWorks() {
-        UserRequest request = new UserRequest("u", "u@mail.com", "User", "pw", UserRole.Admin);
+        UserRequest request = new UserRequest("u", "u@mail.com", "User", "pw", UserRole.ADMIN);
 
         assertEquals("u", request.username());
         assertEquals("u@mail.com", request.email());
         assertEquals("User", request.name());
         assertEquals("pw", request.password());
-        assertEquals(UserRole.Admin, request.role());
+        assertEquals(UserRole.ADMIN, request.role());
     }
 
     @Test
     void userResponseRecordWorks() {
-        UserResponse response = new UserResponse(3L, "u", "u@mail.com", "User", UserRole.Mandor);
+        UserResponse response = new UserResponse(3L, "u", "u@mail.com", "User", UserRole.MANDOR);
 
         assertEquals(3L, response.id());
         assertEquals("u", response.username());
         assertEquals("u@mail.com", response.email());
         assertEquals("User", response.name());
-        assertEquals(UserRole.Mandor, response.role());
+        assertEquals(UserRole.MANDOR, response.role());
     }
 
     @Test

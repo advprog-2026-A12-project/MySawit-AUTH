@@ -44,7 +44,7 @@ class UserServiceTest {
             "andi@example.com",
             "Andi",
             "secret",
-            UserRole.Admin
+            UserRole.ADMIN
         );
     }
 
@@ -69,7 +69,7 @@ class UserServiceTest {
         assertEquals("andi01", response.username());
         assertEquals("andi@example.com", response.email());
         assertEquals("Andi", response.name());
-        assertEquals(UserRole.Admin, response.role());
+        assertEquals(UserRole.ADMIN, response.role());
     }
 
     @Test
@@ -99,7 +99,7 @@ class UserServiceTest {
 
     @Test
     void createUserUsernameBlank() {
-        UserRequest invalid = new UserRequest(" ", "mail@test.com", "Name", "secret", UserRole.Admin);
+        UserRequest invalid = new UserRequest(" ", "mail@test.com", "Name", "secret", UserRole.ADMIN);
 
         InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class, () -> userService.createUser(invalid));
         assertEquals("username is required", ex.getMessage());
@@ -107,7 +107,7 @@ class UserServiceTest {
 
     @Test
     void createUserEmailBlank() {
-        UserRequest invalid = new UserRequest("user", "", "Name", "secret", UserRole.Admin);
+        UserRequest invalid = new UserRequest("user", "", "Name", "secret", UserRole.ADMIN);
 
         InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class, () -> userService.createUser(invalid));
         assertEquals("email is required", ex.getMessage());
@@ -115,7 +115,7 @@ class UserServiceTest {
 
     @Test
     void createUserNameBlank() {
-        UserRequest invalid = new UserRequest("user", "mail@test.com", " ", "secret", UserRole.Admin);
+        UserRequest invalid = new UserRequest("user", "mail@test.com", " ", "secret", UserRole.ADMIN);
 
         InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class, () -> userService.createUser(invalid));
         assertEquals("name is required", ex.getMessage());
@@ -123,7 +123,7 @@ class UserServiceTest {
 
     @Test
     void createUserPasswordBlank() {
-        UserRequest invalid = new UserRequest("user", "mail@test.com", "Name", " ", UserRole.Admin);
+        UserRequest invalid = new UserRequest("user", "mail@test.com", "Name", " ", UserRole.ADMIN);
 
         InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class, () -> userService.createUser(invalid));
         assertEquals("password is required", ex.getMessage());
@@ -145,14 +145,14 @@ class UserServiceTest {
         user.setEmail("u1@mail.com");
         user.setName("User One");
         user.setPassword("pw");
-        user.setRole(UserRole.Buruh);
+        user.setRole(UserRole.BURUH);
         when(userRepository.findAll()).thenReturn(List.of(user));
 
         List<UserResponse> responses = userService.getAllUsers();
 
         assertEquals(1, responses.size());
         assertEquals(10L, responses.getFirst().id());
-        assertEquals(UserRole.Buruh, responses.getFirst().role());
+        assertEquals(UserRole.BURUH, responses.getFirst().role());
     }
 
     @Test
@@ -163,7 +163,7 @@ class UserServiceTest {
         user.setEmail("mandor@mail.com");
         user.setName("Mandor");
         user.setPassword("pw");
-        user.setRole(UserRole.Mandor);
+        user.setRole(UserRole.MANDOR);
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
 
         UserResponse response = userService.getUserById(7L);
@@ -188,7 +188,7 @@ class UserServiceTest {
         existing.setEmail("old@mail.com");
         existing.setName("Old");
         existing.setPassword("oldpw");
-        existing.setRole(UserRole.Buruh);
+        existing.setRole(UserRole.BURUH);
 
         User updated = new User();
         updated.setId(1L);
@@ -207,7 +207,7 @@ class UserServiceTest {
 
         assertEquals(1L, response.id());
         assertEquals("andi01", response.username());
-        assertEquals(UserRole.Admin, response.role());
+        assertEquals(UserRole.ADMIN, response.role());
     }
 
     @Test
@@ -226,7 +226,7 @@ class UserServiceTest {
         existing.setEmail("old@mail.com");
         existing.setName("Old");
         existing.setPassword("oldpw");
-        existing.setRole(UserRole.Buruh);
+        existing.setRole(UserRole.BURUH);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(userRepository.existsByUsername(request.username())).thenReturn(true);
@@ -243,7 +243,7 @@ class UserServiceTest {
         existing.setEmail("old@mail.com");
         existing.setName("Old");
         existing.setPassword("oldpw");
-        existing.setRole(UserRole.Buruh);
+        existing.setRole(UserRole.BURUH);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(userRepository.existsByEmail(request.email())).thenReturn(true);
@@ -260,7 +260,7 @@ class UserServiceTest {
         existing.setEmail(request.email());
         existing.setName("Old");
         existing.setPassword("oldpw");
-        existing.setRole(UserRole.Buruh);
+        existing.setRole(UserRole.BURUH);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(userRepository.save(existing)).thenReturn(existing);
