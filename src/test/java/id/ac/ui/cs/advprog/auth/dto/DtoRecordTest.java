@@ -103,15 +103,12 @@ class DtoRecordTest {
                 .refreshToken("refresh-token")
                 .tokenType("Bearer")
                 .expiresIn(900)
-                .user(user)
                 .build();
 
         assertEquals("access-token", data.getAccessToken());
         assertEquals("refresh-token", data.getRefreshToken());
         assertEquals("Bearer", data.getTokenType());
         assertEquals(900, data.getExpiresIn());
-        assertNotNull(data.getUser());
-        assertEquals("Ahmad Buruh", data.getUser().getName());
     }
 
     @Test

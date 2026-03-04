@@ -146,7 +146,6 @@ class AuthControllerTest {
                     .refreshToken("raw-refresh-token")
                     .tokenType("Bearer")
                     .expiresIn(900)
-                    .user(userDto)
                     .build();
 
             when(authService.login(any(LoginRequest.class))).thenReturn(responseData);

@@ -276,9 +276,6 @@ class AuthServiceImplTest {
             assertEquals("raw-refresh", result.getRefreshToken());
             assertEquals("Bearer", result.getTokenType());
             assertEquals(900, result.getExpiresIn());
-            assertNotNull(result.getUser());
-            assertEquals(sampleUser.getId(), result.getUser().getId());
-            assertEquals("BURUH", result.getUser().getRole());
             verify(refreshTokenRepository).save(any(RefreshToken.class));
         }
 
