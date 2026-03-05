@@ -30,7 +30,10 @@ public class SecurityConfig {
             JwtAuthenticationFilter jwtAuthFilter) throws Exception {
 
         return http
-                .csrf(csrf -> csrf.disable())
+            .csrf(csrf -> csrf.ignoringRequestMatchers(
+                "/api/**",
+                "/h2-console/**"
+            ))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> {
