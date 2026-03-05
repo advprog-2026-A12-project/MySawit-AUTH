@@ -195,7 +195,7 @@ public class AuthServiceImpl implements AuthService {
                 .replaceAll("[^a-z0-9\\s-]", "")
                 .replaceAll("\\s+", "-")
                 .replaceAll("-+", "-")
-                .replaceAll("^-|-$", "");
+            .replaceAll("(^-|-$)", "");
 
         String candidate;
         do {
