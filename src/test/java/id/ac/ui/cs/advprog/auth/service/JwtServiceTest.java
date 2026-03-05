@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -52,8 +53,8 @@ class JwtServiceTest {
         Claims claims = jwtService.extractAllClaims(token);
 
         assertEquals(user.getId().toString(), claims.getSubject());
-        assertEquals("ahmad@example.com", claims.get("email", String.class));
-        assertEquals("Ahmad Buruh", claims.get("name", String.class));
+        assertNull(claims.get("email", String.class));
+        assertNull(claims.get("name", String.class));
         assertEquals("BURUH", claims.get("role", String.class));
         assertNotNull(claims.getIssuedAt());
         assertNotNull(claims.getExpiration());
