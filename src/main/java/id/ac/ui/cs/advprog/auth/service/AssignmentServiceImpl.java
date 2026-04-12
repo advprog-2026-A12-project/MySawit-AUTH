@@ -5,6 +5,7 @@ import id.ac.ui.cs.advprog.auth.dto.request.management.ReassignBuruhMandorReques
 import id.ac.ui.cs.advprog.auth.dto.response.management.AssignmentUserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorUnassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.ReassignmentUserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.AssignmentConflictException;
@@ -98,6 +99,31 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .previousMandor(toReassignmentUserSummary(previousMandor))
                 .newMandor(toReassignmentUserSummary(newMandor))
                 .reassignedAt(saved.getAssignedAt())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public BuruhMandorUnassignmentResponseData unassignBuruhFromMandor(UUID buruhId) {
+        BuruhMandorAssignment activeAssignment = assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)
+                .orElseThrow(() -> new UserNotFoundException("Buruh not found or has no active assignment"));
+
+        User buruh = activeAssignment.getBuruh();
+        if (!buruh.isActive() || buruh.getRole() != UserRole.BURUH) {
+            throw new UserNotFoundException("Buruh not found or has no active assignment");
+        }
+
+        User previousMandor = activeAssignment.getMandor();
+        Instant unassignedAt = Instant.now();
+
+        activeAssignment.setActive(false);
+        activeAssignment.setUnassignedAt(unassignedAt);
+        assignmentRepository.save(activeAssignment);
+
+        return BuruhMandorUnassignmentResponseData.builder()
+                .buruh(toReassignmentUserSummary(buruh))
+                .previousMandor(toReassignmentUserSummary(previousMandor))
+                .unassignedAt(unassignedAt)
                 .build();
     }
 

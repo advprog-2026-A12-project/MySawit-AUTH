@@ -5,6 +5,7 @@ import id.ac.ui.cs.advprog.auth.dto.request.management.ReassignBuruhMandorReques
 import id.ac.ui.cs.advprog.auth.dto.response.BaseResponse;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorUnassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.exception.ForbiddenException;
 import id.ac.ui.cs.advprog.auth.service.AssignmentService;
 import java.util.UUID;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -50,6 +52,17 @@ public class AssignmentController {
 
         BuruhMandorReassignmentResponseData data = assignmentService.reassignBuruhToMandor(buruhId, request);
         return ResponseEntity.ok(BaseResponse.success("Buruh reassigned successfully", data));
+    }
+
+    @DeleteMapping("/buruh-mandor/{buruhId}")
+    public ResponseEntity<BaseResponse<BuruhMandorUnassignmentResponseData>> unassignBuruhFromMandor(
+            @PathVariable UUID buruhId,
+            Authentication authentication
+    ) {
+        enforceAdminOnly(authentication);
+
+        BuruhMandorUnassignmentResponseData data = assignmentService.unassignBuruhFromMandor(buruhId);
+        return ResponseEntity.ok(BaseResponse.success("Buruh unassigned from Mandor successfully", data));
     }
 
     private void enforceAdminOnly(Authentication authentication) {
