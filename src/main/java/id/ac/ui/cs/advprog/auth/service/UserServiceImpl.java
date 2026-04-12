@@ -1,8 +1,10 @@
 package id.ac.ui.cs.advprog.auth.service;
 
+import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
@@ -19,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,7 @@ public class UserServiceImpl implements UserService {
     private static final List<String> ALLOWED_SORT_FIELDS = List.of("name", "email", "role", "createdAt");
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional(readOnly = true)
@@ -74,6 +78,39 @@ public class UserServiceImpl implements UserService {
                 .updatedAt(user.getUpdatedAt())
                 .build();
             }
+
+    @Override
+    @Transactional
+    public UpdatedMyProfileResponseData updateMyProfile(UUID userId, UpdateMyProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        boolean hasNameUpdate = request.getName() != null && !request.getName().isBlank();
+        boolean hasPasswordUpdate = request.getPassword() != null && !request.getPassword().isBlank();
+
+        if (!hasNameUpdate && !hasPasswordUpdate) {
+            throw new InvalidUserRequestException("At least one of name or password must be provided");
+        }
+
+        if (hasNameUpdate) {
+            user.setName(request.getName());
+        }
+
+        if (hasPasswordUpdate) {
+            user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        }
+
+        User saved = userRepository.save(user);
+
+        return UpdatedMyProfileResponseData.builder()
+                .id(saved.getId())
+                .username(saved.getUsername())
+                .email(saved.getEmail())
+                .name(saved.getName())
+                .role(saved.getRole().name())
+                .updatedAt(saved.getUpdatedAt())
+                .build();
+    }
 
     private void validatePageParams(int page, int size) {
         if (page < 0) {

@@ -1,12 +1,15 @@
 package id.ac.ui.cs.advprog.auth.controller;
 
+import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.BaseResponse;
+import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.exception.ForbiddenException;
 import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.service.UserService;
 import java.util.UUID;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -14,6 +17,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,6 +63,16 @@ public class UserController {
         UUID userId = extractAuthenticatedUserId(authentication);
         UserDetailResponseData data = userService.getUserById(userId);
         return ResponseEntity.ok(BaseResponse.success("Profile retrieved successfully", data));
+    }
+
+    @PutMapping("/me")
+    public ResponseEntity<BaseResponse<UpdatedMyProfileResponseData>> updateMyProfile(
+            @Valid @RequestBody UpdateMyProfileRequest request,
+            Authentication authentication
+    ) {
+        UUID userId = extractAuthenticatedUserId(authentication);
+        UpdatedMyProfileResponseData data = userService.updateMyProfile(userId, request);
+        return ResponseEntity.ok(BaseResponse.success("Profile updated successfully", data));
     }
 
     private void enforceAdminOnly(Authentication authentication) {
