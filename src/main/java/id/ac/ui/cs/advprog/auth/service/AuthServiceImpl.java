@@ -52,7 +52,7 @@ public class AuthServiceImpl implements AuthService {
             throw new DuplicateUserException("Mandor certification number");
         }
 
-        String username = generateUniqueUsername(request.getName());
+        String username = generateUniqueUsername(request.getName()); // Haursnya bisa dihapus
 
         User user = User.builder()
                 .username(username)

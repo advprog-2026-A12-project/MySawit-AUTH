@@ -105,7 +105,9 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.status").value("error"));
+                    .andExpect(jsonPath("$.status").value("error"))
+                    .andExpect(jsonPath("$.field").value("email"))
+                    .andExpect(jsonPath("$.message").value("Email is already registered"));
         }
 
         @Test
@@ -118,7 +120,8 @@ class AuthControllerTest {
                             .content(invalidJson))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status").value("error"))
-                    .andExpect(jsonPath("$.errors").isArray());
+                    .andExpect(jsonPath("$.field").exists())
+                    .andExpect(jsonPath("$.message").exists());
         }
     }
 
@@ -174,7 +177,9 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.status").value("error"));
+                    .andExpect(jsonPath("$.status").value("error"))
+                    .andExpect(jsonPath("$.field").doesNotExist())
+                    .andExpect(jsonPath("$.message").value("Invalid email or password"));
         }
     }
 
@@ -256,7 +261,9 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.status").value("error"));
+                                        .andExpect(jsonPath("$.status").value("error"))
+                                        .andExpect(jsonPath("$.field").doesNotExist())
+                                        .andExpect(jsonPath("$.message").value("Refresh token not found"));
         }
     }
 }

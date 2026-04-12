@@ -11,7 +11,8 @@ class ExceptionClassTest {
     @Test
     void duplicateUserExceptionMessage() {
         DuplicateUserException ex = new DuplicateUserException("username");
-        assertEquals("username already exists", ex.getMessage());
+        assertEquals("username is already registered", ex.getMessage());
+        assertEquals("username", ex.getField());
         assertEquals(HttpStatus.CONFLICT, ex.getHttpStatus());
     }
 

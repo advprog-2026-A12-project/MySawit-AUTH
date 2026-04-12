@@ -8,6 +8,6 @@ import org.springframework.http.HttpStatus;
 public class DuplicateUserException extends BaseException {
 
     public DuplicateUserException(String field) {
-        super(HttpStatus.CONFLICT, field + " already exists");
+        super(HttpStatus.CONFLICT, field.toLowerCase(), field + " is already registered");
     }
 }
