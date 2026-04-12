@@ -10,6 +10,7 @@ import id.ac.ui.cs.advprog.auth.dto.request.management.AssignBuruhMandorRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.management.ReassignBuruhMandorRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorUnassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.AssignmentConflictException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
@@ -291,5 +292,53 @@ class AssignmentServiceImplTest {
         UnprocessableEntityException ex = assertThrows(UnprocessableEntityException.class,
                 () -> assignmentService.reassignBuruhToMandor(buruhId, request));
         assertEquals("New mandor must be different from current mandor", ex.getMessage());
+    }
+
+    @Test
+    void unassignBuruhFromMandorReturnsResponseData() {
+        UUID buruhId = UUID.randomUUID();
+        UUID mandorId = UUID.randomUUID();
+
+        User buruh = User.builder()
+                .id(buruhId)
+                .name("Ahmad Buruh")
+                .email("ahmad@example.com")
+                .role(UserRole.BURUH)
+                .isActive(true)
+                .build();
+
+        User mandor = User.builder()
+                .id(mandorId)
+                .name("Budi Mandor")
+                .email("budi@example.com")
+                .role(UserRole.MANDOR)
+                .isActive(true)
+                .build();
+
+        BuruhMandorAssignment activeAssignment = BuruhMandorAssignment.builder()
+                .id(UUID.randomUUID())
+                .buruh(buruh)
+                .mandor(mandor)
+                .isActive(true)
+                .assignedAt(Instant.now())
+                .build();
+
+        when(assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)).thenReturn(Optional.of(activeAssignment));
+        when(assignmentRepository.save(any(BuruhMandorAssignment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BuruhMandorUnassignmentResponseData response = assignmentService.unassignBuruhFromMandor(buruhId);
+
+        assertEquals("Ahmad Buruh", response.getBuruh().getName());
+        assertEquals("Budi Mandor", response.getPreviousMandor().getName());
+    }
+
+    @Test
+    void unassignBuruhFromMandorThrows404WhenNoActiveAssignment() {
+        UUID buruhId = UUID.randomUUID();
+        when(assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)).thenReturn(Optional.empty());
+
+        UserNotFoundException ex = assertThrows(UserNotFoundException.class,
+                () -> assignmentService.unassignBuruhFromMandor(buruhId));
+        assertEquals("Buruh not found or has no active assignment", ex.getMessage());
     }
 }
