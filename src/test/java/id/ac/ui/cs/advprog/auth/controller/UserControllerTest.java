@@ -135,4 +135,35 @@ class UserControllerTest {
                                 .andExpect(jsonPath("$.status").value("error"))
                                 .andExpect(jsonPath("$.message").value("User with id " + userId + " not found"));
         }
+
+    @Test
+    void getMyProfileReturns200ForAuthenticatedUser() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserDetailResponseData detail = UserDetailResponseData.builder()
+                .id(userId)
+                .username("ahmad-buruh-a1b2")
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh")
+                .role("BURUH")
+                .isActive(true)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        when(userService.getUserById(userId)).thenReturn(detail);
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .with(user(userId.toString()).roles("BURUH")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("Profile retrieved successfully"))
+                .andExpect(jsonPath("$.data.id").value(userId.toString()));
+    }
+
+    @Test
+    void getMyProfileReturns401WithoutAuth() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value("error"));
+    }
 }
