@@ -17,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AdminAccountInitializerTest {
@@ -37,6 +38,7 @@ class AdminAccountInitializerTest {
     @Test
     void runSkipsWhenAdminEmailAlreadyExists() throws Exception {
         when(userRepository.existsByEmail("admin@mysawit.local")).thenReturn(true);
+        ReflectionTestUtils.setField(initializer, "adminInitialSecret", "secret-from-test");
 
         initializer.run();
 
@@ -48,7 +50,8 @@ class AdminAccountInitializerTest {
     void runSeedsAdminWithPreferredUsernameWhenAvailable() throws Exception {
         when(userRepository.existsByEmail("admin@mysawit.local")).thenReturn(false);
         when(userRepository.existsByUsername("admin")).thenReturn(false);
-        when(passwordEncoder.encode("admin123")).thenReturn("encoded-admin-password");
+        when(passwordEncoder.encode("secret-from-test")).thenReturn("encoded-admin-password");
+        ReflectionTestUtils.setField(initializer, "adminInitialSecret", "secret-from-test");
 
         initializer.run();
 
@@ -70,7 +73,8 @@ class AdminAccountInitializerTest {
         when(userRepository.existsByUsername("admin")).thenReturn(true);
         when(userRepository.existsByUsername("admin-1")).thenReturn(true);
         when(userRepository.existsByUsername("admin-2")).thenReturn(false);
-        when(passwordEncoder.encode("admin123")).thenReturn("encoded-admin-password");
+        when(passwordEncoder.encode("secret-from-test")).thenReturn("encoded-admin-password");
+        ReflectionTestUtils.setField(initializer, "adminInitialSecret", "secret-from-test");
 
         initializer.run();
 
@@ -80,5 +84,16 @@ class AdminAccountInitializerTest {
 
         assertEquals("admin-2", saved.getUsername());
         assertEquals(UserRole.ADMIN, saved.getRole());
+    }
+
+    @Test
+    void runSkipsWhenAdminInitialSecretMissing() throws Exception {
+        when(userRepository.existsByEmail("admin@mysawit.local")).thenReturn(false);
+        ReflectionTestUtils.setField(initializer, "adminInitialSecret", " ");
+
+        initializer.run();
+
+        verify(userRepository, never()).save(any(User.class));
+        verify(passwordEncoder, never()).encode(any());
     }
 }
