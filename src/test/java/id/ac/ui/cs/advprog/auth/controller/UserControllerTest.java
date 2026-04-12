@@ -175,6 +175,15 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.status").value("error"));
     }
 
+        @Test
+        void getMyProfileReturns401ForInvalidAuthenticatedUserId() throws Exception {
+                mockMvc.perform(get("/api/v1/users/me")
+                                                .with(user("not-a-uuid").roles("BURUH")))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("Unauthorized"));
+        }
+
     @Test
     void updateMyProfileReturns200ForAuthenticatedUser() throws Exception {
         UUID userId = UUID.randomUUID();
@@ -219,4 +228,19 @@ class UserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value("error"));
     }
+
+        @Test
+        void updateMyProfileReturns401ForInvalidAuthenticatedUserId() throws Exception {
+                UpdateMyProfileRequest request = UpdateMyProfileRequest.builder()
+                                .name("Updated")
+                                .build();
+
+                mockMvc.perform(put("/api/v1/users/me")
+                                                .with(user("not-a-uuid").roles("BURUH"))
+                                                .contentType(MediaType.APPLICATION_JSON)
+                                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("Unauthorized"));
+        }
 }

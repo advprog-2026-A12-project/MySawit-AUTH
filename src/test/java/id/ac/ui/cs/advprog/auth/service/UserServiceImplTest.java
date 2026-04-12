@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +21,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -104,6 +111,102 @@ class UserServiceImplTest {
 
         assertEquals("size must be between 1 and 100", ex.getMessage());
     }
+
+        @Test
+        void getUsersThrowsOnNegativePage() {
+                InvalidUserRequestException ex = assertThrows(
+                                InvalidUserRequestException.class,
+                                () -> userService.getUsers(-1, 20, "createdAt,desc", null, null, null)
+                );
+
+                assertEquals("page must be greater than or equal to 0", ex.getMessage());
+        }
+
+        @Test
+        void getUsersThrowsOnInvalidSortFormat() {
+                InvalidUserRequestException ex = assertThrows(
+                                InvalidUserRequestException.class,
+                                () -> userService.getUsers(0, 20, "createdAt", null, null, null)
+                );
+
+                assertEquals("Invalid sort format. Use field,direction", ex.getMessage());
+        }
+
+        @Test
+        void getUsersThrowsOnInvalidSortField() {
+                InvalidUserRequestException ex = assertThrows(
+                                InvalidUserRequestException.class,
+                                () -> userService.getUsers(0, 20, "username,asc", null, null, null)
+                );
+
+                assertEquals("Invalid sort field: username", ex.getMessage());
+        }
+
+        @Test
+        void getUsersThrowsOnInvalidSortDirection() {
+                InvalidUserRequestException ex = assertThrows(
+                                InvalidUserRequestException.class,
+                                () -> userService.getUsers(0, 20, "createdAt,up", null, null, null)
+                );
+
+                assertEquals("Invalid sort direction: up", ex.getMessage());
+        }
+
+        @Test
+        void getUsersUsesDefaultSortWhenBlank() {
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                userService.getUsers(0, 10, "  ", null, null, null);
+
+                verify(userRepository).findAll(any(Specification.class), pageableCaptor.capture());
+                assertEquals("createdAt: DESC", pageableCaptor.getValue().getSort().toString());
+        }
+
+        @Test
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        void getUsersBuildSpecificationEvaluatesAllPredicates() {
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                userService.getUsers(0, 20, "createdAt,desc", "Ahmad", "ahmad@example.com", "BURUH");
+
+                ArgumentCaptor<Specification<User>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+                verify(userRepository).findAll(specCaptor.capture(), any(Pageable.class));
+                Specification<User> specification = specCaptor.getValue();
+
+                Root<User> root = mock(Root.class);
+                CriteriaQuery<?> query = mock(CriteriaQuery.class);
+                CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+                Path namePath = mock(Path.class);
+                Path emailPath = mock(Path.class);
+                Path rolePath = mock(Path.class);
+                Expression<String> loweredName = mock(Expression.class);
+                Expression<String> loweredEmail = mock(Expression.class);
+
+                Predicate namePredicate = mock(Predicate.class);
+                Predicate emailPredicate = mock(Predicate.class);
+                Predicate rolePredicate = mock(Predicate.class);
+                Predicate combined = mock(Predicate.class);
+
+                when(root.get("name")).thenReturn(namePath);
+                when(root.get("email")).thenReturn(emailPath);
+                when(root.get("role")).thenReturn(rolePath);
+                when(cb.lower(namePath)).thenReturn(loweredName);
+                when(cb.lower(emailPath)).thenReturn(loweredEmail);
+                when(cb.like(loweredName, "%ahmad%")).thenReturn(namePredicate);
+                when(cb.like(loweredEmail, "%ahmad@example.com%")).thenReturn(emailPredicate);
+                when(cb.equal(rolePath, UserRole.BURUH)).thenReturn(rolePredicate);
+                when(cb.and(any(Predicate[].class))).thenReturn(combined);
+
+                Predicate result = specification.toPredicate(root, query, cb);
+
+                assertEquals(combined, result);
+                verify(cb).like(loweredName, "%ahmad%");
+                verify(cb).like(loweredEmail, "%ahmad@example.com%");
+                verify(cb).equal(rolePath, UserRole.BURUH);
+        }
 
     @Test
     void getUserByIdReturnsDetail() {
@@ -193,4 +296,19 @@ class UserServiceImplTest {
 
         assertEquals("At least one of name or password must be provided", ex.getMessage());
     }
+
+        @Test
+        void updateMyProfileThrowsWhenUserMissing() {
+                UUID userId = UUID.randomUUID();
+                UpdateMyProfileRequest request = UpdateMyProfileRequest.builder()
+                                .name("Updated")
+                                .build();
+
+                when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+                UserNotFoundException ex = assertThrows(UserNotFoundException.class,
+                                () -> userService.updateMyProfile(userId, request));
+
+                assertEquals("User with id " + userId + " not found", ex.getMessage());
+        }
 }

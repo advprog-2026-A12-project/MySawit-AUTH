@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +23,12 @@ import id.ac.ui.cs.advprog.auth.model.BuruhMandorAssignment;
 import id.ac.ui.cs.advprog.auth.model.User;
 import id.ac.ui.cs.advprog.auth.repository.BuruhMandorAssignmentRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,9 +37,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 
 @ExtendWith(MockitoExtension.class)
 class AssignmentServiceImplTest {
@@ -110,6 +119,71 @@ class AssignmentServiceImplTest {
 
         assertEquals("size must be between 1 and 100", ex.getMessage());
     }
+
+        @Test
+        void getAssignmentsThrows400ForNegativePage() {
+                InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class,
+                                () -> assignmentService.getAssignments(-1, 20, null, null, null));
+
+                assertEquals("page must be greater than or equal to 0", ex.getMessage());
+        }
+
+        @Test
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        void getAssignmentsBuildSpecificationEvaluatesAllPredicates() {
+                when(assignmentRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(org.springframework.data.domain.Pageable.class)))
+                                .thenReturn(new PageImpl<>(java.util.List.of()));
+
+                UUID mandorId = UUID.randomUUID();
+                assignmentService.getAssignments(0, 20, mandorId, "ahmad", "budi");
+
+                ArgumentCaptor<Specification<BuruhMandorAssignment>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+                verify(assignmentRepository).findAll(specCaptor.capture(), any(org.springframework.data.domain.Pageable.class));
+                Specification<BuruhMandorAssignment> specification = specCaptor.getValue();
+
+                Root<BuruhMandorAssignment> root = mock(Root.class);
+                CriteriaQuery<?> query = mock(CriteriaQuery.class);
+                CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+                Path isActivePath = mock(Path.class);
+                Path mandorPath = mock(Path.class);
+                Path mandorIdPath = mock(Path.class);
+                Path buruhPath = mock(Path.class);
+                Path buruhNamePath = mock(Path.class);
+                Path mandorNamePath = mock(Path.class);
+
+                Expression<String> loweredBuruhName = mock(Expression.class);
+                Expression<String> loweredMandorName = mock(Expression.class);
+
+                Predicate activePredicate = mock(Predicate.class);
+                Predicate mandorPredicate = mock(Predicate.class);
+                Predicate buruhNamePredicate = mock(Predicate.class);
+                Predicate mandorNamePredicate = mock(Predicate.class);
+                Predicate combined = mock(Predicate.class);
+
+                when(root.get("isActive")).thenReturn(isActivePath);
+                when(root.get("mandor")).thenReturn(mandorPath);
+                when(mandorPath.get("id")).thenReturn(mandorIdPath);
+                when(root.get("buruh")).thenReturn(buruhPath);
+                when(buruhPath.get("name")).thenReturn(buruhNamePath);
+                when(mandorPath.get("name")).thenReturn(mandorNamePath);
+
+                when(cb.isTrue(isActivePath)).thenReturn(activePredicate);
+                when(cb.equal(mandorIdPath, mandorId)).thenReturn(mandorPredicate);
+                when(cb.lower(buruhNamePath)).thenReturn(loweredBuruhName);
+                when(cb.lower(mandorNamePath)).thenReturn(loweredMandorName);
+                when(cb.like(loweredBuruhName, "%ahmad%")).thenReturn(buruhNamePredicate);
+                when(cb.like(loweredMandorName, "%budi%")).thenReturn(mandorNamePredicate);
+                when(cb.and(any(Predicate[].class))).thenReturn(combined);
+
+                Predicate result = specification.toPredicate(root, query, cb);
+
+                assertEquals(combined, result);
+                verify(cb).isTrue(isActivePath);
+                verify(cb).equal(mandorIdPath, mandorId);
+                verify(cb).like(loweredBuruhName, "%ahmad%");
+                verify(cb).like(loweredMandorName, "%budi%");
+        }
 
     @Test
     void assignBuruhToMandorReturnsResponseData() {

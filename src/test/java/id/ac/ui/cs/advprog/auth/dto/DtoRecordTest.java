@@ -155,6 +155,17 @@ class DtoRecordTest {
     }
 
     @Test
+    void baseResponseErrorWithoutFieldErrorsWorks() {
+        BaseResponse<Void> response = BaseResponse.error("Unauthorized");
+
+        assertEquals("error", response.getStatus());
+        assertEquals("Unauthorized", response.getMessage());
+        assertNull(response.getData());
+        assertNull(response.getErrors());
+        assertNotNull(response.getTimestamp());
+    }
+
+    @Test
     void fieldErrorDtoWorks() {
         FieldErrorDto dto = new FieldErrorDto("name", "Name is required");
 
