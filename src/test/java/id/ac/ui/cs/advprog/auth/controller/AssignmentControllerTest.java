@@ -4,14 +4,18 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.auth.config.SecurityConfig;
 import id.ac.ui.cs.advprog.auth.dto.request.management.AssignBuruhMandorRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.management.ReassignBuruhMandorRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.management.AssignmentUserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.ReassignmentUserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.service.AssignmentService;
 import id.ac.ui.cs.advprog.auth.service.JwtService;
 import java.time.Instant;
@@ -98,6 +102,73 @@ class AssignmentControllerTest {
                 .build();
 
         mockMvc.perform(post("/api/v1/assignments/buruh-mandor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value("error"));
+    }
+
+    @Test
+    void reassignBuruhToMandorReturns200ForAdmin() throws Exception {
+        UUID buruhId = UUID.randomUUID();
+        ReassignBuruhMandorRequest request = ReassignBuruhMandorRequest.builder()
+                .newMandorId(UUID.randomUUID())
+                .build();
+
+        BuruhMandorReassignmentResponseData response = BuruhMandorReassignmentResponseData.builder()
+                .buruh(ReassignmentUserSummaryResponseData.builder()
+                        .id(buruhId)
+                        .name("Ahmad Buruh")
+                        .build())
+                .previousMandor(ReassignmentUserSummaryResponseData.builder()
+                        .id(UUID.randomUUID())
+                        .name("Budi Mandor")
+                        .build())
+                .newMandor(ReassignmentUserSummaryResponseData.builder()
+                        .id(request.getNewMandorId())
+                        .name("Dedi Mandor")
+                        .build())
+                .reassignedAt(Instant.now())
+                .build();
+
+        when(assignmentService.reassignBuruhToMandor(org.mockito.ArgumentMatchers.eq(buruhId), any(ReassignBuruhMandorRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(put("/api/v1/assignments/buruh-mandor/{buruhId}", buruhId)
+                        .with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("Buruh reassigned successfully"))
+                .andExpect(jsonPath("$.data.buruh.name").value("Ahmad Buruh"))
+                .andExpect(jsonPath("$.data.newMandor.name").value("Dedi Mandor"));
+    }
+
+    @Test
+    void reassignBuruhToMandorReturns403ForNonAdmin() throws Exception {
+        UUID buruhId = UUID.randomUUID();
+        ReassignBuruhMandorRequest request = ReassignBuruhMandorRequest.builder()
+                .newMandorId(UUID.randomUUID())
+                .build();
+
+        mockMvc.perform(put("/api/v1/assignments/buruh-mandor/{buruhId}", buruhId)
+                        .with(user("buruh").roles("BURUH"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value("error"))
+                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+    }
+
+    @Test
+    void reassignBuruhToMandorReturns401WithoutAuth() throws Exception {
+        UUID buruhId = UUID.randomUUID();
+        ReassignBuruhMandorRequest request = ReassignBuruhMandorRequest.builder()
+                .newMandorId(UUID.randomUUID())
+                .build();
+
+        mockMvc.perform(put("/api/v1/assignments/buruh-mandor/{buruhId}", buruhId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
