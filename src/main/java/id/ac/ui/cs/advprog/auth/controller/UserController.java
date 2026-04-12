@@ -4,6 +4,7 @@ import id.ac.ui.cs.advprog.auth.dto.response.BaseResponse;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.exception.ForbiddenException;
+import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.service.UserService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,13 @@ public class UserController {
         return ResponseEntity.ok(BaseResponse.success("User detail retrieved successfully", data));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<BaseResponse<UserDetailResponseData>> getMyProfile(Authentication authentication) {
+        UUID userId = extractAuthenticatedUserId(authentication);
+        UserDetailResponseData data = userService.getUserById(userId);
+        return ResponseEntity.ok(BaseResponse.success("Profile retrieved successfully", data));
+    }
+
     private void enforceAdminOnly(Authentication authentication) {
         if (authentication == null || authentication.getAuthorities() == null) {
             throw new ForbiddenException();
@@ -63,6 +71,18 @@ public class UserController {
 
         if (!hasAdminRole) {
             throw new ForbiddenException("Only ADMIN can access this resource");
+        }
+    }
+
+    private UUID extractAuthenticatedUserId(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw new UnauthorizedException("Unauthorized");
+        }
+
+        try {
+            return UUID.fromString(authentication.getName());
+        } catch (IllegalArgumentException ex) {
+            throw new UnauthorizedException("Unauthorized");
         }
     }
 }
