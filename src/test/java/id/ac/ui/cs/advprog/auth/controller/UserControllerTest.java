@@ -10,8 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import id.ac.ui.cs.advprog.auth.config.SecurityConfig;
+import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
+import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.service.JwtService;
 import id.ac.ui.cs.advprog.auth.service.UserService;
 import java.time.Instant;
@@ -87,4 +89,50 @@ class UserControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value("error"));
     }
+
+        @Test
+        void getUserByIdReturns200ForAdmin() throws Exception {
+                UUID userId = UUID.randomUUID();
+                UserDetailResponseData detail = UserDetailResponseData.builder()
+                                .id(userId)
+                                .username("ahmad-buruh-a1b2")
+                                .email("ahmad@example.com")
+                                .name("Ahmad Buruh")
+                                .role("BURUH")
+                                .isActive(true)
+                                .createdAt(Instant.now())
+                                .updatedAt(Instant.now())
+                                .build();
+
+                when(userService.getUserById(userId)).thenReturn(detail);
+
+                mockMvc.perform(get("/api/v1/users/{userId}", userId)
+                                                .with(user("admin").roles("ADMIN")))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.status").value("success"))
+                                .andExpect(jsonPath("$.message").value("User detail retrieved successfully"))
+                                .andExpect(jsonPath("$.data.id").value(userId.toString()))
+                                .andExpect(jsonPath("$.data.email").value("ahmad@example.com"));
+        }
+
+        @Test
+        void getUserByIdReturns403ForNonAdmin() throws Exception {
+                mockMvc.perform(get("/api/v1/users/{userId}", UUID.randomUUID())
+                                                .with(user("buruh").roles("BURUH")))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+        }
+
+        @Test
+        void getUserByIdReturns404WhenMissing() throws Exception {
+                UUID userId = UUID.randomUUID();
+                when(userService.getUserById(userId)).thenThrow(new UserNotFoundException(userId));
+
+                mockMvc.perform(get("/api/v1/users/{userId}", userId)
+                                                .with(user("admin").roles("ADMIN")))
+                                .andExpect(status().isNotFound())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("User with id " + userId + " not found"));
+        }
 }

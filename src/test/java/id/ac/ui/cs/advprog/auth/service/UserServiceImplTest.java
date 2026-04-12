@@ -6,13 +6,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
+import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.model.User;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -93,5 +96,41 @@ class UserServiceImplTest {
         );
 
         assertEquals("size must be between 1 and 100", ex.getMessage());
+    }
+
+    @Test
+    void getUserByIdReturnsDetail() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .username("ahmad-buruh-a1b2")
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh")
+                .role(UserRole.BURUH)
+                .isActive(true)
+                .oauthProvider("GOOGLE")
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        UserDetailResponseData detail = userService.getUserById(userId);
+
+        assertEquals(userId, detail.getId());
+        assertEquals("ahmad@example.com", detail.getEmail());
+        assertEquals("BURUH", detail.getRole());
+        assertEquals("GOOGLE", detail.getOauthProvider());
+    }
+
+    @Test
+    void getUserByIdThrowsWhenMissing() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        UserNotFoundException ex = assertThrows(UserNotFoundException.class,
+                () -> userService.getUserById(userId));
+
+        assertEquals("User with id " + userId + " not found", ex.getMessage());
     }
 }
