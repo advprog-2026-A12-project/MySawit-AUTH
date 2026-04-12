@@ -3,13 +3,18 @@ package id.ac.ui.cs.advprog.auth.controller;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.auth.config.SecurityConfig;
+import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
+import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
@@ -23,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -32,6 +38,8 @@ class UserControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+        private final ObjectMapper objectMapper = new ObjectMapper();
 
     @MockitoBean
     private UserService userService;
@@ -164,6 +172,51 @@ class UserControllerTest {
     void getMyProfileReturns401WithoutAuth() throws Exception {
         mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value("error"));
+    }
+
+    @Test
+    void updateMyProfileReturns200ForAuthenticatedUser() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UpdateMyProfileRequest request = UpdateMyProfileRequest.builder()
+                .name("Ahmad Buruh Updated")
+                .password("NewSecureP@ss456")
+                .build();
+
+        UpdatedMyProfileResponseData data = UpdatedMyProfileResponseData.builder()
+                .id(userId)
+                .username("ahmad-buruh-a1b2")
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh Updated")
+                .role("BURUH")
+                .updatedAt(Instant.now())
+                .build();
+
+        when(userService.updateMyProfile(eq(userId), org.mockito.ArgumentMatchers.any(UpdateMyProfileRequest.class)))
+                .thenReturn(data);
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .with(user(userId.toString()).roles("BURUH"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("Profile updated successfully"))
+                .andExpect(jsonPath("$.data.name").value("Ahmad Buruh Updated"));
+    }
+
+    @Test
+    void updateMyProfileReturns400OnInvalidPassword() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UpdateMyProfileRequest request = UpdateMyProfileRequest.builder()
+                .password("short")
+                .build();
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .with(user(userId.toString()).roles("BURUH"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value("error"));
     }
 }

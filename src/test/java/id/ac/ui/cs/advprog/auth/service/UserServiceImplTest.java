@@ -3,10 +3,13 @@ package id.ac.ui.cs.advprog.auth.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
@@ -27,12 +30,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceImplTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @Captor
     private ArgumentCaptor<Pageable> pageableCaptor;
@@ -41,7 +48,7 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(userRepository);
+        userService = new UserServiceImpl(userRepository, passwordEncoder);
     }
 
     @Test
@@ -132,5 +139,58 @@ class UserServiceImplTest {
                 () -> userService.getUserById(userId));
 
         assertEquals("User with id " + userId + " not found", ex.getMessage());
+    }
+
+    @Test
+    void updateMyProfileUpdatesNameAndPassword() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .username("ahmad-buruh-a1b2")
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh")
+                .role(UserRole.BURUH)
+                .passwordHash("old-hash")
+                .isActive(true)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        UpdateMyProfileRequest request = UpdateMyProfileRequest.builder()
+                .name("Ahmad Buruh Updated")
+                .password("NewSecureP@ss456")
+                .build();
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("NewSecureP@ss456")).thenReturn("encoded-password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatedMyProfileResponseData response = userService.updateMyProfile(userId, request);
+
+        assertEquals(userId, response.getId());
+        assertEquals("Ahmad Buruh Updated", response.getName());
+        assertEquals("BURUH", response.getRole());
+        verify(passwordEncoder).encode(eq("NewSecureP@ss456"));
+    }
+
+    @Test
+    void updateMyProfileThrowsWhenNoFieldsProvided() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .username("ahmad-buruh-a1b2")
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh")
+                .role(UserRole.BURUH)
+                .isActive(true)
+                .build();
+
+        UpdateMyProfileRequest request = UpdateMyProfileRequest.builder().build();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class,
+                () -> userService.updateMyProfile(userId, request));
+
+        assertEquals("At least one of name or password must be provided", ex.getMessage());
     }
 }
