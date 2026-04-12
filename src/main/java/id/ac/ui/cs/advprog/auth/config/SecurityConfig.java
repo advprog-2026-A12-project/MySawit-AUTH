@@ -1,9 +1,11 @@
 package id.ac.ui.cs.advprog.auth.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import id.ac.ui.cs.advprog.auth.exception.ErrorResponse;
 import id.ac.ui.cs.advprog.auth.security.JwtAuthenticationFilter;
 import id.ac.ui.cs.advprog.auth.service.JwtService;
 import jakarta.servlet.http.HttpServletResponse;
-import java.time.Instant;
+import java.io.IOException;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +24,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(JwtService jwtService) {
@@ -53,25 +57,30 @@ public class SecurityConfig {
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            response.getWriter().write(
-                                    "{\"status\":\"error\","
-                                    + "\"message\":\"Unauthorized\","
-                                    + "\"timestamp\":\"" + Instant.now() + "\"}");
+                        writeErrorResponse(
+                            response,
+                            HttpServletResponse.SC_UNAUTHORIZED,
+                            ErrorResponse.of("authorization", "Unauthorized")
+                        );
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            response.getWriter().write(
-                                    "{\"status\":\"error\","
-                                    + "\"message\":\"Access denied\","
-                                    + "\"timestamp\":\"" + Instant.now() + "\"}");
+                        writeErrorResponse(
+                            response,
+                            HttpServletResponse.SC_FORBIDDEN,
+                            ErrorResponse.of("authorization", "Access denied")
+                        );
                         })
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
+
+            private void writeErrorResponse(HttpServletResponse response, int status, ErrorResponse error)
+                throws IOException {
+            response.setStatus(status);
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            objectMapper.writeValue(response.getWriter(), error);
+            }
 
     @Bean
     public PasswordEncoder passwordEncoder() {

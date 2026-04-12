@@ -15,14 +15,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.auth.config.SecurityConfig;
-import id.ac.ui.cs.advprog.auth.dto.request.LoginRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.LogoutRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.RefreshTokenRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.RegisterRequest;
-import id.ac.ui.cs.advprog.auth.dto.response.LoginResponseData;
-import id.ac.ui.cs.advprog.auth.dto.response.LoginUserDto;
-import id.ac.ui.cs.advprog.auth.dto.response.RegisterResponseData;
-import id.ac.ui.cs.advprog.auth.dto.response.TokenRefreshResponseData;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.LoginRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.LogoutRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.RefreshTokenRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.RegisterRequest;
+import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginUserDto;
+import id.ac.ui.cs.advprog.auth.dto.response.auth.RegisterResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.auth.TokenRefreshResponseData;
 import id.ac.ui.cs.advprog.auth.exception.DuplicateUserException;
 import id.ac.ui.cs.advprog.auth.exception.InvalidTokenException;
 import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
@@ -105,7 +105,9 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.status").value("error"));
+                    .andExpect(jsonPath("$.status").value("error"))
+                    .andExpect(jsonPath("$.field").value("email"))
+                    .andExpect(jsonPath("$.message").value("Email is already registered"));
         }
 
         @Test
@@ -118,7 +120,8 @@ class AuthControllerTest {
                             .content(invalidJson))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status").value("error"))
-                    .andExpect(jsonPath("$.errors").isArray());
+                    .andExpect(jsonPath("$.field").exists())
+                    .andExpect(jsonPath("$.message").exists());
         }
     }
 
@@ -174,7 +177,9 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.status").value("error"));
+                    .andExpect(jsonPath("$.status").value("error"))
+                    .andExpect(jsonPath("$.field").doesNotExist())
+                    .andExpect(jsonPath("$.message").value("Invalid email or password"));
         }
     }
 
@@ -256,7 +261,9 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.status").value("error"));
+                                        .andExpect(jsonPath("$.status").value("error"))
+                                        .andExpect(jsonPath("$.field").doesNotExist())
+                                        .andExpect(jsonPath("$.message").value("Refresh token not found"));
         }
     }
 }

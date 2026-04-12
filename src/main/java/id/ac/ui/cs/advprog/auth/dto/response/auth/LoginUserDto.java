@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.auth.dto.response;
+package id.ac.ui.cs.advprog.auth.dto.response.auth;
 
 import java.util.UUID;
 import lombok.AllArgsConstructor;

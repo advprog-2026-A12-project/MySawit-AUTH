@@ -3,8 +3,11 @@ services:
     build: .
     container_name: auth-app
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "8001:8001"
     environment:
-      APP_PROFILE: local
-      SERVER_PORT: 8001
+      APP_PROFILE: ${APP_PROFILE:-local}
+      SERVER_PORT: ${SERVER_PORT:-8001}
+      ADMIN_INITIAL_SECRET: ${ADMIN_INITIAL_SECRET:-admin123}
