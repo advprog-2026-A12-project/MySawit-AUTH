@@ -1,5 +1,6 @@
-package id.ac.ui.cs.advprog.auth.dto.response;
+package id.ac.ui.cs.advprog.auth.dto.request.auth;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,10 +10,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TokenRefreshResponseData {
+public class LogoutRequest {
 
-    private String accessToken;
+    @NotBlank(message = "Refresh token is required")
     private String refreshToken;
-    private String tokenType;
-    private int expiresIn;
 }
