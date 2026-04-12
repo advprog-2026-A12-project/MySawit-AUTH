@@ -1,15 +1,19 @@
 package id.ac.ui.cs.advprog.auth.service;
 
 import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
+import id.ac.ui.cs.advprog.auth.dto.response.management.DeletedUserResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
+import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.model.User;
+import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
+import java.time.Instant;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +36,7 @@ public class UserServiceImpl implements UserService {
     private static final List<String> ALLOWED_SORT_FIELDS = List.of("name", "email", "role", "createdAt");
 
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -78,6 +83,32 @@ public class UserServiceImpl implements UserService {
                 .updatedAt(user.getUpdatedAt())
                 .build();
             }
+
+    @Override
+    @Transactional
+    public DeletedUserResponseData deleteUser(UUID userId, UUID authenticatedAdminId) {
+        User user = userRepository.findById(userId)
+                .filter(User::isActive)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (userId.equals(authenticatedAdminId)) {
+            throw new UnprocessableEntityException("Admin cannot delete their own account");
+        }
+
+        user.setActive(false);
+        Instant deletedAt = Instant.now();
+        user.setUpdatedAt(deletedAt);
+
+        User saved = userRepository.save(user);
+        refreshTokenRepository.deleteAllByUser(saved);
+
+        return DeletedUserResponseData.builder()
+                .id(saved.getId())
+                .email(saved.getEmail())
+                .name(saved.getName())
+                .deletedAt(deletedAt)
+                .build();
+    }
 
     @Override
     @Transactional

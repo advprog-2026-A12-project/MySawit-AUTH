@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,10 +15,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.auth.config.SecurityConfig;
 import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
+import id.ac.ui.cs.advprog.auth.dto.response.management.DeletedUserResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
+import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.service.JwtService;
 import id.ac.ui.cs.advprog.auth.service.UserService;
@@ -183,6 +186,79 @@ class UserControllerTest {
                                 .andExpect(jsonPath("$.status").value("error"))
                                 .andExpect(jsonPath("$.message").value("Unauthorized"));
         }
+
+                    @Test
+                    void deleteUserReturns200ForAdmin() throws Exception {
+                        UUID userId = UUID.randomUUID();
+                        UUID adminId = UUID.randomUUID();
+                        DeletedUserResponseData deleted = DeletedUserResponseData.builder()
+                                .id(userId)
+                                .email("ahmad@example.com")
+                                .name("Ahmad Buruh")
+                                .deletedAt(Instant.now())
+                                .build();
+
+                        when(userService.deleteUser(eq(userId), eq(adminId))).thenReturn(deleted);
+
+                        mockMvc.perform(delete("/api/v1/users/{userId}", userId)
+                                        .with(user(adminId.toString()).roles("ADMIN")))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.status").value("success"))
+                                .andExpect(jsonPath("$.message").value("User deleted successfully"))
+                                .andExpect(jsonPath("$.data.id").value(userId.toString()))
+                                .andExpect(jsonPath("$.data.email").value("ahmad@example.com"));
+                    }
+
+                    @Test
+                    void deleteUserReturns403ForNonAdmin() throws Exception {
+                        mockMvc.perform(delete("/api/v1/users/{userId}", UUID.randomUUID())
+                                        .with(user(UUID.randomUUID().toString()).roles("BURUH")))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+                    }
+
+                    @Test
+                    void deleteUserReturns401WithoutAuth() throws Exception {
+                        mockMvc.perform(delete("/api/v1/users/{userId}", UUID.randomUUID()))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.status").value("error"));
+                    }
+
+                    @Test
+                    void deleteUserReturns404WhenTargetMissing() throws Exception {
+                        UUID userId = UUID.randomUUID();
+                        UUID adminId = UUID.randomUUID();
+                        when(userService.deleteUser(eq(userId), eq(adminId))).thenThrow(new UserNotFoundException(userId));
+
+                        mockMvc.perform(delete("/api/v1/users/{userId}", userId)
+                                        .with(user(adminId.toString()).roles("ADMIN")))
+                                .andExpect(status().isNotFound())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("User with id " + userId + " not found"));
+                    }
+
+                    @Test
+                    void deleteUserReturns422WhenAdminDeletesSelf() throws Exception {
+                        UUID userId = UUID.randomUUID();
+                        when(userService.deleteUser(eq(userId), eq(userId)))
+                                .thenThrow(new UnprocessableEntityException("Admin cannot delete their own account"));
+
+                        mockMvc.perform(delete("/api/v1/users/{userId}", userId)
+                                        .with(user(userId.toString()).roles("ADMIN")))
+                                .andExpect(status().is(422))
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("Admin cannot delete their own account"));
+                    }
+
+                    @Test
+                    void deleteUserReturns401ForInvalidAuthenticatedAdminId() throws Exception {
+                        mockMvc.perform(delete("/api/v1/users/{userId}", UUID.randomUUID())
+                                        .with(user("not-a-uuid").roles("ADMIN")))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("Unauthorized"));
+                    }
 
     @Test
     void updateMyProfileReturns200ForAuthenticatedUser() throws Exception {

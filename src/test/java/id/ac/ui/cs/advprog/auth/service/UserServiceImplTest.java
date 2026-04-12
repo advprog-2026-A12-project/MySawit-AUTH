@@ -9,13 +9,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
+import id.ac.ui.cs.advprog.auth.dto.response.management.DeletedUserResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
+import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.model.User;
+import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
@@ -48,6 +51,9 @@ class UserServiceImplTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+        @Mock
+        private RefreshTokenRepository refreshTokenRepository;
+
     @Captor
     private ArgumentCaptor<Pageable> pageableCaptor;
 
@@ -55,7 +61,7 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(userRepository, passwordEncoder);
+                userService = new UserServiceImpl(userRepository, refreshTokenRepository, passwordEncoder);
     }
 
     @Test
@@ -311,4 +317,75 @@ class UserServiceImplTest {
 
                 assertEquals("User with id " + userId + " not found", ex.getMessage());
         }
+
+    @Test
+    void deleteUserSoftDeletesAndRemovesTokens() {
+        UUID targetUserId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        User user = User.builder()
+                .id(targetUserId)
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh")
+                .isActive(true)
+                .build();
+
+        when(userRepository.findById(targetUserId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DeletedUserResponseData response = userService.deleteUser(targetUserId, adminId);
+
+        assertEquals(targetUserId, response.getId());
+        assertEquals("ahmad@example.com", response.getEmail());
+        assertEquals("Ahmad Buruh", response.getName());
+        verify(refreshTokenRepository).deleteAllByUser(user);
+    }
+
+    @Test
+    void deleteUserThrowsWhenAdminDeletesSelf() {
+        UUID targetUserId = UUID.randomUUID();
+        User user = User.builder()
+                .id(targetUserId)
+                .isActive(true)
+                .build();
+        when(userRepository.findById(targetUserId)).thenReturn(Optional.of(user));
+
+        UnprocessableEntityException ex = assertThrows(
+                UnprocessableEntityException.class,
+                () -> userService.deleteUser(targetUserId, targetUserId)
+        );
+
+        assertEquals("Admin cannot delete their own account", ex.getMessage());
+    }
+
+    @Test
+    void deleteUserThrowsWhenTargetMissing() {
+        UUID targetUserId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        when(userRepository.findById(targetUserId)).thenReturn(Optional.empty());
+
+        UserNotFoundException ex = assertThrows(
+                UserNotFoundException.class,
+                () -> userService.deleteUser(targetUserId, adminId)
+        );
+
+        assertEquals("User with id " + targetUserId + " not found", ex.getMessage());
+    }
+
+    @Test
+    void deleteUserThrowsWhenTargetAlreadyInactive() {
+        UUID targetUserId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        User user = User.builder()
+                .id(targetUserId)
+                .isActive(false)
+                .build();
+        when(userRepository.findById(targetUserId)).thenReturn(Optional.of(user));
+
+        UserNotFoundException ex = assertThrows(
+                UserNotFoundException.class,
+                () -> userService.deleteUser(targetUserId, adminId)
+        );
+
+        assertEquals("User with id " + targetUserId + " not found", ex.getMessage());
+    }
 }

@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.auth.controller;
 
 import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.BaseResponse;
+import id.ac.ui.cs.advprog.auth.dto.response.management.DeletedUserResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
@@ -17,6 +18,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -63,6 +65,18 @@ public class UserController {
         UUID userId = extractAuthenticatedUserId(authentication);
         UserDetailResponseData data = userService.getUserById(userId);
         return ResponseEntity.ok(BaseResponse.success("Profile retrieved successfully", data));
+    }
+
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<BaseResponse<DeletedUserResponseData>> deleteUser(
+            @PathVariable UUID userId,
+            Authentication authentication
+    ) {
+        enforceAdminOnly(authentication);
+
+        UUID authenticatedAdminId = extractAuthenticatedUserId(authentication);
+        DeletedUserResponseData data = userService.deleteUser(userId, authenticatedAdminId);
+        return ResponseEntity.ok(BaseResponse.success("User deleted successfully", data));
     }
 
     @PutMapping("/me")
