@@ -1,15 +1,18 @@
 package id.ac.ui.cs.advprog.auth.controller;
 
 import id.ac.ui.cs.advprog.auth.dto.response.BaseResponse;
+import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.exception.ForbiddenException;
 import id.ac.ui.cs.advprog.auth.service.UserService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +39,17 @@ public class UserController {
 
         UserPageResponseData data = userService.getUsers(page, size, sort, name, email, role);
         return ResponseEntity.ok(BaseResponse.success("Users retrieved successfully", data));
+    }
+
+    @GetMapping("/{userId}")
+    public ResponseEntity<BaseResponse<UserDetailResponseData>> getUserById(
+            @PathVariable UUID userId,
+            Authentication authentication
+    ) {
+        enforceAdminOnly(authentication);
+
+        UserDetailResponseData data = userService.getUserById(userId);
+        return ResponseEntity.ok(BaseResponse.success("User detail retrieved successfully", data));
     }
 
     private void enforceAdminOnly(Authentication authentication) {
