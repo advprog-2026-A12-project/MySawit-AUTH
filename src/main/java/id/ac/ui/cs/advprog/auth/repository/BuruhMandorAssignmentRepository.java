@@ -4,8 +4,10 @@ import id.ac.ui.cs.advprog.auth.model.BuruhMandorAssignment;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface BuruhMandorAssignmentRepository extends JpaRepository<BuruhMandorAssignment, UUID> {
+public interface BuruhMandorAssignmentRepository
+        extends JpaRepository<BuruhMandorAssignment, UUID>, JpaSpecificationExecutor<BuruhMandorAssignment> {
     boolean existsByBuruhIdAndIsActiveTrue(UUID buruhId);
     Optional<BuruhMandorAssignment> findByBuruhIdAndIsActiveTrue(UUID buruhId);
 }

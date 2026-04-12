@@ -3,16 +3,19 @@ package id.ac.ui.cs.advprog.auth.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import id.ac.ui.cs.advprog.auth.dto.request.management.AssignBuruhMandorRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.management.ReassignBuruhMandorRequest;
+import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorUnassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.AssignmentConflictException;
+import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.model.BuruhMandorAssignment;
@@ -27,6 +30,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
 class AssignmentServiceImplTest {
@@ -42,6 +48,67 @@ class AssignmentServiceImplTest {
     @BeforeEach
     void setUp() {
         assignmentService = new AssignmentServiceImpl(assignmentRepository, userRepository);
+    }
+
+    @Test
+    void getAssignmentsReturnsPaginatedActiveAssignments() {
+        UUID buruhId = UUID.randomUUID();
+        UUID mandorId = UUID.randomUUID();
+        UUID assignmentId = UUID.randomUUID();
+
+        User buruh = User.builder()
+                .id(buruhId)
+                .name("Ahmad Buruh")
+                .email("ahmad@example.com")
+                .role(UserRole.BURUH)
+                .isActive(true)
+                .build();
+
+        User mandor = User.builder()
+                .id(mandorId)
+                .name("Budi Mandor")
+                .email("budi@example.com")
+                .role(UserRole.MANDOR)
+                .isActive(true)
+                .build();
+
+        BuruhMandorAssignment assignment = BuruhMandorAssignment.builder()
+                .id(assignmentId)
+                .buruh(buruh)
+                .mandor(mandor)
+                .assignedAt(Instant.now())
+                .isActive(true)
+                .build();
+
+        Page<BuruhMandorAssignment> page = new PageImpl<>(
+                java.util.List.of(assignment),
+                PageRequest.of(0, 20),
+                1
+        );
+
+        when(assignmentRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(page);
+
+        BuruhMandorAssignmentPageResponseData response = assignmentService.getAssignments(
+                0,
+                20,
+                mandorId,
+                "ahmad",
+                "budi"
+        );
+
+        assertEquals(1, response.getContent().size());
+        assertEquals("ahmad@example.com", response.getContent().get(0).getBuruh().getEmail());
+        assertEquals("budi@example.com", response.getContent().get(0).getMandor().getEmail());
+        assertEquals(1, response.getTotalElements());
+    }
+
+    @Test
+    void getAssignmentsThrows400ForInvalidSize() {
+        InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class,
+                () -> assignmentService.getAssignments(0, 0, null, null, null));
+
+        assertEquals("size must be between 1 and 100", ex.getMessage());
     }
 
     @Test

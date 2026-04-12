@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,6 +15,7 @@ import id.ac.ui.cs.advprog.auth.config.SecurityConfig;
 import id.ac.ui.cs.advprog.auth.dto.request.management.AssignBuruhMandorRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.management.ReassignBuruhMandorRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.management.AssignmentUserSummaryResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorUnassignmentResponseData;
@@ -44,6 +46,62 @@ class AssignmentControllerTest {
     private JwtService jwtService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void getAssignmentsReturns200ForAdmin() throws Exception {
+        BuruhMandorAssignmentResponseData assignment = BuruhMandorAssignmentResponseData.builder()
+                .id(UUID.randomUUID())
+                .buruh(AssignmentUserSummaryResponseData.builder()
+                        .id(UUID.randomUUID())
+                        .name("Ahmad Buruh")
+                        .email("ahmad@example.com")
+                        .build())
+                .mandor(AssignmentUserSummaryResponseData.builder()
+                        .id(UUID.randomUUID())
+                        .name("Budi Mandor")
+                        .email("budi@example.com")
+                        .build())
+                .assignedAt(Instant.now())
+                .build();
+
+        BuruhMandorAssignmentPageResponseData response = BuruhMandorAssignmentPageResponseData.builder()
+                .content(java.util.List.of(assignment))
+                .page(0)
+                .size(20)
+                .totalElements(1)
+                .totalPages(1)
+                .first(true)
+                .last(true)
+                .build();
+
+        when(assignmentService.getAssignments(any(Integer.class), any(Integer.class), any(), any(), any()))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/assignments/buruh-mandor")
+                        .with(user("admin").roles("ADMIN"))
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("Assignments retrieved successfully"))
+                .andExpect(jsonPath("$.data.content[0].buruh.email").value("ahmad@example.com"));
+    }
+
+    @Test
+    void getAssignmentsReturns403ForNonAdmin() throws Exception {
+        mockMvc.perform(get("/api/v1/assignments/buruh-mandor")
+                        .with(user("buruh").roles("BURUH")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value("error"))
+                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+    }
+
+    @Test
+    void getAssignmentsReturns401WithoutAuth() throws Exception {
+        mockMvc.perform(get("/api/v1/assignments/buruh-mandor"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value("error"));
+    }
 
     @Test
     void assignBuruhToMandorReturns201ForAdmin() throws Exception {
