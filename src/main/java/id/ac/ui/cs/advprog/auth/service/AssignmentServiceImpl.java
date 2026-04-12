@@ -1,14 +1,18 @@
 package id.ac.ui.cs.advprog.auth.service;
 
 import id.ac.ui.cs.advprog.auth.dto.request.management.AssignBuruhMandorRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.management.ReassignBuruhMandorRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.management.AssignmentUserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.ReassignmentUserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.AssignmentConflictException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.model.BuruhMandorAssignment;
 import id.ac.ui.cs.advprog.auth.model.User;
+import java.time.Instant;
 import id.ac.ui.cs.advprog.auth.repository.BuruhMandorAssignmentRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
 import java.util.UUID;
@@ -55,6 +59,48 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .build();
     }
 
+    @Override
+    @Transactional
+    public BuruhMandorReassignmentResponseData reassignBuruhToMandor(UUID buruhId, ReassignBuruhMandorRequest request) {
+        BuruhMandorAssignment activeAssignment = assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)
+                .orElseThrow(() -> new UserNotFoundException("Buruh not found or has no active assignment"));
+
+        User buruh = activeAssignment.getBuruh();
+        if (!buruh.isActive() || buruh.getRole() != UserRole.BURUH) {
+            throw new UserNotFoundException("Buruh not found or has no active assignment");
+        }
+
+        User previousMandor = activeAssignment.getMandor();
+        User newMandor = getActiveUser(request.getNewMandorId(), "New mandor not found");
+
+        if (newMandor.getRole() != UserRole.MANDOR) {
+            throw new UnprocessableEntityException("Provided newMandorId is not a MANDOR user");
+        }
+
+        if (previousMandor.getId().equals(newMandor.getId())) {
+            throw new UnprocessableEntityException("New mandor must be different from current mandor");
+        }
+
+        activeAssignment.setActive(false);
+        activeAssignment.setUnassignedAt(Instant.now());
+        assignmentRepository.save(activeAssignment);
+
+        BuruhMandorAssignment newAssignment = BuruhMandorAssignment.builder()
+                .buruh(buruh)
+                .mandor(newMandor)
+                .isActive(true)
+                .build();
+
+        BuruhMandorAssignment saved = assignmentRepository.save(newAssignment);
+
+        return BuruhMandorReassignmentResponseData.builder()
+                .buruh(toReassignmentUserSummary(buruh))
+                .previousMandor(toReassignmentUserSummary(previousMandor))
+                .newMandor(toReassignmentUserSummary(newMandor))
+                .reassignedAt(saved.getAssignedAt())
+                .build();
+    }
+
     private User getActiveUser(UUID userId, String notFoundMessage) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(notFoundMessage));
@@ -69,6 +115,13 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .build();
+    }
+
+    private ReassignmentUserSummaryResponseData toReassignmentUserSummary(User user) {
+        return ReassignmentUserSummaryResponseData.builder()
+                .id(user.getId())
+                .name(user.getName())
                 .build();
     }
 }
