@@ -8,10 +8,17 @@ import org.junit.jupiter.api.Test;
 
 class ExceptionClassTest {
 
+    private static final class TestBaseException extends BaseException {
+        private TestBaseException(HttpStatus status, String message, Throwable cause) {
+            super(status, message, cause);
+        }
+    }
+
     @Test
     void duplicateUserExceptionMessage() {
         DuplicateUserException ex = new DuplicateUserException("username");
-        assertEquals("username already exists", ex.getMessage());
+        assertEquals("username is already registered", ex.getMessage());
+        assertEquals("username", ex.getField());
         assertEquals(HttpStatus.CONFLICT, ex.getHttpStatus());
     }
 
@@ -91,5 +98,16 @@ class ExceptionClassTest {
         InvalidTokenException ex = new InvalidTokenException("Refresh token revoked");
         assertEquals("Refresh token revoked", ex.getMessage());
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getHttpStatus());
+    }
+
+    @Test
+    void baseExceptionConstructorWithCauseWorks() {
+        IllegalStateException cause = new IllegalStateException("root cause");
+
+        TestBaseException ex = new TestBaseException(HttpStatus.BAD_REQUEST, "bad request", cause);
+
+        assertEquals("bad request", ex.getMessage());
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        assertEquals(cause, ex.getCause());
     }
 }

@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.auth.dto.request;
+package id.ac.ui.cs.advprog.auth.dto.request.auth;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

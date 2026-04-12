@@ -1,8 +1,5 @@
 package id.ac.ui.cs.advprog.auth.exception;
 
-import id.ac.ui.cs.advprog.auth.dto.response.BaseResponse;
-import id.ac.ui.cs.advprog.auth.dto.response.FieldErrorDto;
-import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -17,8 +14,8 @@ public class GlobalExceptionHandler {
      * The HTTP status is carried by the exception itself.
      */
     @ExceptionHandler(BaseException.class)
-    public ResponseEntity<BaseResponse<Void>> handleBaseException(BaseException ex) {
-        BaseResponse<Void> body = BaseResponse.error(ex.getMessage());
+    public ResponseEntity<ErrorResponse> handleBaseException(BaseException ex) {
+        ErrorResponse body = ErrorResponse.of(ex.getField(), ex.getMessage());
         return ResponseEntity.status(ex.getHttpStatus()).body(body);
     }
 
@@ -27,14 +24,14 @@ public class GlobalExceptionHandler {
      * Returns 400 with per-field error details.
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<BaseResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
-        List<FieldErrorDto> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> FieldErrorDto.builder()
-                        .field(fe.getField())
-                        .message(fe.getDefaultMessage())
-                        .build())
-                .toList();
-        BaseResponse<Void> body = BaseResponse.error("Validation failed", fieldErrors);
+        public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+        String field = ex.getBindingResult().getFieldErrors().isEmpty()
+            ? null
+            : ex.getBindingResult().getFieldErrors().getFirst().getField();
+        String message = ex.getBindingResult().getFieldErrors().isEmpty()
+            ? "Validation failed"
+            : ex.getBindingResult().getFieldErrors().getFirst().getDefaultMessage();
+        ErrorResponse body = ErrorResponse.of(field, message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
@@ -42,8 +39,8 @@ public class GlobalExceptionHandler {
      * Catch-all for any unexpected exception.
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<BaseResponse<Void>> handleGeneral(Exception ex) {
-        BaseResponse<Void> body = BaseResponse.error("Internal server error");
+    public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
+        ErrorResponse body = ErrorResponse.of("general", "Internal server error");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 }
