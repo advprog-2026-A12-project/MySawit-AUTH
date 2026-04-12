@@ -1,13 +1,13 @@
 package id.ac.ui.cs.advprog.auth.service;
 
-import id.ac.ui.cs.advprog.auth.dto.request.LoginRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.LogoutRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.RefreshTokenRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.RegisterRequest;
-import id.ac.ui.cs.advprog.auth.dto.response.LoginResponseData;
-import id.ac.ui.cs.advprog.auth.dto.response.LoginUserDto;
-import id.ac.ui.cs.advprog.auth.dto.response.RegisterResponseData;
-import id.ac.ui.cs.advprog.auth.dto.response.TokenRefreshResponseData;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.LoginRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.LogoutRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.RefreshTokenRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.RegisterRequest;
+import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginUserDto;
+import id.ac.ui.cs.advprog.auth.dto.response.auth.RegisterResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.auth.TokenRefreshResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.DuplicateUserException;
 import id.ac.ui.cs.advprog.auth.exception.InvalidTokenException;
