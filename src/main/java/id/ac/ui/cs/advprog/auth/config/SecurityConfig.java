@@ -49,6 +49,7 @@ public class SecurityConfig {
                     auth.requestMatchers(
                             "/api/v1/auth/register",
                             "/api/v1/auth/login",
+                            "/api/v1/auth/google",
                             "/api/v1/auth/refresh",
                             "/h2-console/**"
                     ).permitAll();
@@ -90,7 +91,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        configuration.setAllowedOrigins(List.of("http://localhost:3000", "https://mysawit-fe.onrender.com"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

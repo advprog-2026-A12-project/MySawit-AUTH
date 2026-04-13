@@ -96,4 +96,15 @@ class AdminAccountInitializerTest {
         verify(userRepository, never()).save(any(User.class));
         verify(passwordEncoder, never()).encode(any());
     }
+
+    @Test
+    void runSkipsWhenAdminInitialSecretNull() throws Exception {
+        when(userRepository.existsByEmail("admin@mysawit.local")).thenReturn(false);
+        ReflectionTestUtils.setField(initializer, "adminInitialSecret", null);
+
+        initializer.run();
+
+        verify(userRepository, never()).save(any(User.class));
+        verify(passwordEncoder, never()).encode(any());
+    }
 }

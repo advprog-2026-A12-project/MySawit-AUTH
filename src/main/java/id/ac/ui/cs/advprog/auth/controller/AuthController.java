@@ -4,6 +4,7 @@ import id.ac.ui.cs.advprog.auth.dto.request.auth.LoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.LogoutRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RefreshTokenRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RegisterRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.GoogleLoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.BaseResponse;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.RegisterResponseData;
@@ -36,6 +37,13 @@ public class AuthController {
     public ResponseEntity<BaseResponse<LoginResponseData>> login(@Valid @RequestBody LoginRequest request) {
         LoginResponseData data = authService.login(request);
         return ResponseEntity.ok(BaseResponse.success("Login successful", data));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<BaseResponse<LoginResponseData>> loginWithGoogle(
+            @Valid @RequestBody GoogleLoginRequest request) {
+        LoginResponseData data = authService.loginWithGoogle(request);
+        return ResponseEntity.ok(BaseResponse.success("Google login successful", data));
     }
 
     @PostMapping("/logout")
