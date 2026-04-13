@@ -188,22 +188,26 @@ class UserServiceImplTest {
                 Path namePath = mock(Path.class);
                 Path emailPath = mock(Path.class);
                 Path rolePath = mock(Path.class);
+                Path activePath = mock(Path.class);
                 Expression<String> loweredName = mock(Expression.class);
                 Expression<String> loweredEmail = mock(Expression.class);
 
                 Predicate namePredicate = mock(Predicate.class);
                 Predicate emailPredicate = mock(Predicate.class);
                 Predicate rolePredicate = mock(Predicate.class);
+                Predicate activePredicate = mock(Predicate.class);
                 Predicate combined = mock(Predicate.class);
 
                 when(root.get("name")).thenReturn(namePath);
                 when(root.get("email")).thenReturn(emailPath);
                 when(root.get("role")).thenReturn(rolePath);
+                when(root.get("isActive")).thenReturn(activePath);
                 when(cb.lower(namePath)).thenReturn(loweredName);
                 when(cb.lower(emailPath)).thenReturn(loweredEmail);
                 when(cb.like(loweredName, "%ahmad%")).thenReturn(namePredicate);
                 when(cb.like(loweredEmail, "%ahmad@example.com%")).thenReturn(emailPredicate);
                 when(cb.equal(rolePath, UserRole.BURUH)).thenReturn(rolePredicate);
+                when(cb.isTrue(activePath)).thenReturn(activePredicate);
                 when(cb.and(any(Predicate[].class))).thenReturn(combined);
 
                 Predicate result = specification.toPredicate(root, query, cb);
@@ -212,6 +216,7 @@ class UserServiceImplTest {
                 verify(cb).like(loweredName, "%ahmad%");
                 verify(cb).like(loweredEmail, "%ahmad@example.com%");
                 verify(cb).equal(rolePath, UserRole.BURUH);
+                verify(cb).isTrue(activePath);
         }
 
     @Test

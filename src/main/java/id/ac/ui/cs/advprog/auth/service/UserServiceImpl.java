@@ -187,6 +187,8 @@ public class UserServiceImpl implements UserService {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
+            predicates.add(cb.isTrue(root.get("isActive")));
+
             if (name != null && !name.isBlank()) {
                 predicates.add(cb.like(
                         cb.lower(root.get("name")),
