@@ -29,7 +29,7 @@ services:
     ports:
       - "8001:8001"
     environment:
-      APP_PROFILE: dev
+      APP_PROFILE: ${APP_PROFILE:-dev} 
       SERVER_PORT: ${SERVER_PORT:-8001}
       ADMIN_INITIAL_SECRET: ${ADMIN_INITIAL_SECRET:-admin123}
       DB_URL_DEV: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-auth_db_dev}
