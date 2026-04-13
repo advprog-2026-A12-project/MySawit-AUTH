@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -24,11 +25,23 @@ public class GoogleOAuthService {
     private final String googleClientSecret;
     private final String defaultRedirectUri;
 
+    @Autowired
     public GoogleOAuthService(
             @Value("${google.client-id:}") String googleClientId,
             @Value("${google.client-secret:}") String googleClientSecret,
             @Value("${google.redirect-uri:postmessage}") String defaultRedirectUri) {
         this.restClient = RestClient.create();
+        this.googleClientId = googleClientId;
+        this.googleClientSecret = googleClientSecret;
+        this.defaultRedirectUri = defaultRedirectUri;
+    }
+
+    GoogleOAuthService(
+            RestClient restClient,
+            String googleClientId,
+            String googleClientSecret,
+            String defaultRedirectUri) {
+        this.restClient = restClient;
         this.googleClientId = googleClientId;
         this.googleClientSecret = googleClientSecret;
         this.defaultRedirectUri = defaultRedirectUri;

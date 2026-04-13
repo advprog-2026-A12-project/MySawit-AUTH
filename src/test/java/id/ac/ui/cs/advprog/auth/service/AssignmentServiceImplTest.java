@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -121,6 +123,14 @@ class AssignmentServiceImplTest {
     }
 
         @Test
+        void getAssignmentsThrows400ForSizeAboveLimit() {
+                InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class,
+                                () -> assignmentService.getAssignments(0, 101, null, null, null));
+
+                assertEquals("size must be between 1 and 100", ex.getMessage());
+        }
+
+        @Test
         void getAssignmentsThrows400ForNegativePage() {
                 InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class,
                                 () -> assignmentService.getAssignments(-1, 20, null, null, null));
@@ -183,6 +193,70 @@ class AssignmentServiceImplTest {
                 verify(cb).equal(mandorIdPath, mandorId);
                 verify(cb).like(loweredBuruhName, "%ahmad%");
                 verify(cb).like(loweredMandorName, "%budi%");
+        }
+
+        @Test
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        void getAssignmentsBuildSpecificationWithoutOptionalFilters() {
+                when(assignmentRepository.findAll(any(Specification.class), any(org.springframework.data.domain.Pageable.class)))
+                                .thenReturn(new PageImpl<>(java.util.List.of()));
+
+                assignmentService.getAssignments(0, 20, null, "   ", "   ");
+
+                ArgumentCaptor<Specification<BuruhMandorAssignment>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+                verify(assignmentRepository).findAll(specCaptor.capture(), any(org.springframework.data.domain.Pageable.class));
+                Specification<BuruhMandorAssignment> specification = specCaptor.getValue();
+
+                Root<BuruhMandorAssignment> root = mock(Root.class);
+                CriteriaQuery<?> query = mock(CriteriaQuery.class);
+                CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+                Path isActivePath = mock(Path.class);
+                Predicate activePredicate = mock(Predicate.class);
+                Predicate combined = mock(Predicate.class);
+
+                when(root.get("isActive")).thenReturn(isActivePath);
+                when(cb.isTrue(isActivePath)).thenReturn(activePredicate);
+                when(cb.and(any(Predicate[].class))).thenReturn(combined);
+
+                Predicate result = specification.toPredicate(root, query, cb);
+
+                assertEquals(combined, result);
+                verify(cb).isTrue(isActivePath);
+                verify(cb, never()).equal(any(), any());
+                verify(cb, never()).like(any(), anyString());
+        }
+
+        @Test
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        void getAssignmentsBuildSpecificationWithoutOptionalFiltersWhenNull() {
+                when(assignmentRepository.findAll(any(Specification.class), any(org.springframework.data.domain.Pageable.class)))
+                                .thenReturn(new PageImpl<>(java.util.List.of()));
+
+                assignmentService.getAssignments(0, 20, null, null, null);
+
+                ArgumentCaptor<Specification<BuruhMandorAssignment>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+                verify(assignmentRepository).findAll(specCaptor.capture(), any(org.springframework.data.domain.Pageable.class));
+                Specification<BuruhMandorAssignment> specification = specCaptor.getValue();
+
+                Root<BuruhMandorAssignment> root = mock(Root.class);
+                CriteriaQuery<?> query = mock(CriteriaQuery.class);
+                CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+                Path isActivePath = mock(Path.class);
+                Predicate activePredicate = mock(Predicate.class);
+                Predicate combined = mock(Predicate.class);
+
+                when(root.get("isActive")).thenReturn(isActivePath);
+                when(cb.isTrue(isActivePath)).thenReturn(activePredicate);
+                when(cb.and(any(Predicate[].class))).thenReturn(combined);
+
+                Predicate result = specification.toPredicate(root, query, cb);
+
+                assertEquals(combined, result);
+                verify(cb).isTrue(isActivePath);
+                verify(cb, never()).equal(any(), any());
+                verify(cb, never()).like(any(), anyString());
         }
 
     @Test
@@ -282,6 +356,69 @@ class AssignmentServiceImplTest {
         UnprocessableEntityException ex = assertThrows(UnprocessableEntityException.class,
                 () -> assignmentService.assignBuruhToMandor(request));
         assertEquals("Provided buruhId is not a BURUH user", ex.getMessage());
+    }
+
+    @Test
+    void assignBuruhToMandorThrows422WhenMandorRoleInvalid() {
+        UUID buruhId = UUID.randomUUID();
+        UUID mandorId = UUID.randomUUID();
+
+        User buruh = User.builder()
+                .id(buruhId)
+                .email("buruh@example.com")
+                .name("Buruh")
+                .role(UserRole.BURUH)
+                .isActive(true)
+                .build();
+
+        User invalidMandor = User.builder()
+                .id(mandorId)
+                .email("supir@example.com")
+                .name("Supir")
+                .role(UserRole.SUPIR_TRUK)
+                .isActive(true)
+                .build();
+
+        when(userRepository.findById(buruhId)).thenReturn(Optional.of(buruh));
+        when(userRepository.findById(mandorId)).thenReturn(Optional.of(invalidMandor));
+
+        AssignBuruhMandorRequest request = AssignBuruhMandorRequest.builder()
+                .buruhId(buruhId)
+                .mandorId(mandorId)
+                .build();
+
+        UnprocessableEntityException ex = assertThrows(UnprocessableEntityException.class,
+                () -> assignmentService.assignBuruhToMandor(request));
+        assertEquals("Provided mandorId is not a MANDOR user", ex.getMessage());
+    }
+
+    @Test
+    void assignBuruhToMandorThrows404WhenMandorInactive() {
+        UUID buruhId = UUID.randomUUID();
+        UUID mandorId = UUID.randomUUID();
+
+        User buruh = User.builder()
+                .id(buruhId)
+                .role(UserRole.BURUH)
+                .isActive(true)
+                .build();
+        User inactiveMandor = User.builder()
+                .id(mandorId)
+                .role(UserRole.MANDOR)
+                .isActive(false)
+                .build();
+
+        when(userRepository.findById(buruhId)).thenReturn(Optional.of(buruh));
+        when(userRepository.findById(mandorId)).thenReturn(Optional.of(inactiveMandor));
+
+        AssignBuruhMandorRequest request = AssignBuruhMandorRequest.builder()
+                .buruhId(buruhId)
+                .mandorId(mandorId)
+                .build();
+
+        UserNotFoundException ex = assertThrows(UserNotFoundException.class,
+                () -> assignmentService.assignBuruhToMandor(request));
+        assertEquals("Mandor not found", ex.getMessage());
     }
 
     @Test
@@ -436,6 +573,81 @@ class AssignmentServiceImplTest {
     }
 
     @Test
+    void reassignBuruhToMandorThrows422WhenNewMandorRoleInvalid() {
+        UUID buruhId = UUID.randomUUID();
+        UUID oldMandorId = UUID.randomUUID();
+        UUID newMandorId = UUID.randomUUID();
+
+        User buruh = User.builder().id(buruhId).role(UserRole.BURUH).isActive(true).build();
+        User oldMandor = User.builder().id(oldMandorId).role(UserRole.MANDOR).isActive(true).build();
+        User invalidNewMandor = User.builder().id(newMandorId).role(UserRole.SUPIR_TRUK).isActive(true).build();
+
+        BuruhMandorAssignment activeAssignment = BuruhMandorAssignment.builder()
+                .buruh(buruh)
+                .mandor(oldMandor)
+                .isActive(true)
+                .assignedAt(Instant.now())
+                .build();
+
+        when(assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)).thenReturn(Optional.of(activeAssignment));
+        when(userRepository.findById(newMandorId)).thenReturn(Optional.of(invalidNewMandor));
+
+        ReassignBuruhMandorRequest request = ReassignBuruhMandorRequest.builder().newMandorId(newMandorId).build();
+
+        UnprocessableEntityException ex = assertThrows(UnprocessableEntityException.class,
+                () -> assignmentService.reassignBuruhToMandor(buruhId, request));
+        assertEquals("Provided newMandorId is not a MANDOR user", ex.getMessage());
+    }
+
+    @Test
+    void reassignBuruhToMandorThrows404WhenStoredBuruhInactive() {
+        UUID buruhId = UUID.randomUUID();
+        UUID newMandorId = UUID.randomUUID();
+
+        User inactiveBuruh = User.builder().id(buruhId).role(UserRole.BURUH).isActive(false).build();
+        User oldMandor = User.builder().id(UUID.randomUUID()).role(UserRole.MANDOR).isActive(true).build();
+
+        BuruhMandorAssignment activeAssignment = BuruhMandorAssignment.builder()
+                .buruh(inactiveBuruh)
+                .mandor(oldMandor)
+                .isActive(true)
+                .assignedAt(Instant.now())
+                .build();
+
+        when(assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)).thenReturn(Optional.of(activeAssignment));
+
+        ReassignBuruhMandorRequest request = ReassignBuruhMandorRequest.builder().newMandorId(newMandorId).build();
+
+        UserNotFoundException ex = assertThrows(UserNotFoundException.class,
+                () -> assignmentService.reassignBuruhToMandor(buruhId, request));
+        assertEquals("Buruh not found or has no active assignment", ex.getMessage());
+    }
+
+    @Test
+    void reassignBuruhToMandorThrows404WhenStoredBuruhRoleInvalid() {
+        UUID buruhId = UUID.randomUUID();
+        UUID newMandorId = UUID.randomUUID();
+
+        User invalidBuruh = User.builder().id(buruhId).role(UserRole.ADMIN).isActive(true).build();
+        User oldMandor = User.builder().id(UUID.randomUUID()).role(UserRole.MANDOR).isActive(true).build();
+
+        BuruhMandorAssignment activeAssignment = BuruhMandorAssignment.builder()
+                .buruh(invalidBuruh)
+                .mandor(oldMandor)
+                .isActive(true)
+                .assignedAt(Instant.now())
+                .build();
+
+        when(assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)).thenReturn(Optional.of(activeAssignment));
+
+        ReassignBuruhMandorRequest request = ReassignBuruhMandorRequest.builder().newMandorId(newMandorId).build();
+
+        UserNotFoundException ex = assertThrows(UserNotFoundException.class,
+                () -> assignmentService.reassignBuruhToMandor(buruhId, request));
+        assertEquals("Buruh not found or has no active assignment", ex.getMessage());
+    }
+
+    @Test
     void unassignBuruhFromMandorReturnsResponseData() {
         UUID buruhId = UUID.randomUUID();
         UUID mandorId = UUID.randomUUID();
@@ -477,6 +689,48 @@ class AssignmentServiceImplTest {
     void unassignBuruhFromMandorThrows404WhenNoActiveAssignment() {
         UUID buruhId = UUID.randomUUID();
         when(assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)).thenReturn(Optional.empty());
+
+        UserNotFoundException ex = assertThrows(UserNotFoundException.class,
+                () -> assignmentService.unassignBuruhFromMandor(buruhId));
+        assertEquals("Buruh not found or has no active assignment", ex.getMessage());
+    }
+
+        @Test
+        void unassignBuruhFromMandorThrows404WhenStoredBuruhInactive() {
+                UUID buruhId = UUID.randomUUID();
+
+                User inactiveBuruh = User.builder().id(buruhId).role(UserRole.BURUH).isActive(false).build();
+                User mandor = User.builder().id(UUID.randomUUID()).role(UserRole.MANDOR).isActive(true).build();
+
+                BuruhMandorAssignment activeAssignment = BuruhMandorAssignment.builder()
+                                .buruh(inactiveBuruh)
+                                .mandor(mandor)
+                                .isActive(true)
+                                .assignedAt(Instant.now())
+                                .build();
+
+                when(assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)).thenReturn(Optional.of(activeAssignment));
+
+                UserNotFoundException ex = assertThrows(UserNotFoundException.class,
+                                () -> assignmentService.unassignBuruhFromMandor(buruhId));
+                assertEquals("Buruh not found or has no active assignment", ex.getMessage());
+    }
+
+    @Test
+    void unassignBuruhFromMandorThrows404WhenStoredBuruhRoleInvalid() {
+        UUID buruhId = UUID.randomUUID();
+
+        User invalidBuruh = User.builder().id(buruhId).role(UserRole.ADMIN).isActive(true).build();
+        User mandor = User.builder().id(UUID.randomUUID()).role(UserRole.MANDOR).isActive(true).build();
+
+        BuruhMandorAssignment activeAssignment = BuruhMandorAssignment.builder()
+                .buruh(invalidBuruh)
+                .mandor(mandor)
+                .isActive(true)
+                .assignedAt(Instant.now())
+                .build();
+
+        when(assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)).thenReturn(Optional.of(activeAssignment));
 
         UserNotFoundException ex = assertThrows(UserNotFoundException.class,
                 () -> assignmentService.unassignBuruhFromMandor(buruhId));

@@ -419,6 +419,101 @@ class AuthServiceImplTest {
             verify(userRepository).save(sampleUser);
             verify(refreshTokenRepository).save(any(RefreshToken.class));
         }
+
+        @Test
+        void loginWithGoogleUsesExistingProviderUser() {
+            GoogleLoginRequest request = GoogleLoginRequest.builder()
+                    .authorizationCode("google-auth-code")
+                    .redirectUri("postmessage")
+                    .build();
+            sampleUser.setOauthProvider("GOOGLE");
+            sampleUser.setOauthProviderId("google-sub-existing");
+
+            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+                    .thenReturn(new GoogleUserInfo("google-sub-existing", "ahmad@example.com", "Ahmad"));
+            when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-existing"))
+                    .thenReturn(Optional.of(sampleUser));
+
+            when(jwtService.generateAccessToken(sampleUser)).thenReturn("access-jwt");
+            when(jwtService.generateRefreshToken()).thenReturn("raw-refresh");
+            when(jwtService.hashToken("raw-refresh")).thenReturn("hashed-refresh");
+            when(jwtService.getAccessTokenExpiration()).thenReturn(900L);
+            when(jwtService.getRefreshTokenExpiration()).thenReturn(604800L);
+
+            LoginResponseData result = authService.loginWithGoogle(request);
+
+            assertEquals("access-jwt", result.getAccessToken());
+            verify(userRepository, never()).save(sampleUser);
+            verify(refreshTokenRepository).save(any(RefreshToken.class));
+        }
+
+        @Test
+        void loginWithGoogleThrowsWhenLinkedProviderDifferent() {
+            GoogleLoginRequest request = GoogleLoginRequest.builder()
+                    .authorizationCode("google-auth-code")
+                    .redirectUri("postmessage")
+                    .build();
+            sampleUser.setOauthProvider("GITHUB");
+            sampleUser.setOauthProviderId("github-sub");
+
+            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+                    .thenReturn(new GoogleUserInfo("google-sub-1", "ahmad@example.com", "Ahmad"));
+            when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-1"))
+                    .thenReturn(Optional.empty());
+            when(userRepository.findByEmail("ahmad@example.com"))
+                    .thenReturn(Optional.of(sampleUser));
+
+            assertThrows(UnauthorizedException.class,
+                    () -> authService.loginWithGoogle(request));
+        }
+
+        @Test
+        void loginWithGoogleThrowsWhenExistingProviderUserInactive() {
+            GoogleLoginRequest request = GoogleLoginRequest.builder()
+                    .authorizationCode("google-auth-code")
+                    .redirectUri("postmessage")
+                    .build();
+            sampleUser.setOauthProvider("GOOGLE");
+            sampleUser.setOauthProviderId("google-sub-inactive");
+            sampleUser.setActive(false);
+
+            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+                    .thenReturn(new GoogleUserInfo("google-sub-inactive", "ahmad@example.com", "Ahmad"));
+            when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-inactive"))
+                    .thenReturn(Optional.of(sampleUser));
+
+            assertThrows(UnauthorizedException.class,
+                    () -> authService.loginWithGoogle(request));
+        }
+
+        @Test
+        void loginWithGoogleUsesEmailWhenGoogleNameBlank() {
+            GoogleLoginRequest request = GoogleLoginRequest.builder()
+                    .authorizationCode("google-auth-code")
+                    .redirectUri("postmessage")
+                    .build();
+
+            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+                    .thenReturn(new GoogleUserInfo("google-sub-blank", "blank@example.com", " "));
+            when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-blank"))
+                    .thenReturn(Optional.empty());
+            when(userRepository.findByEmail("blank@example.com")).thenReturn(Optional.empty());
+            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+
+            ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+            when(userRepository.save(userCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+            when(jwtService.generateAccessToken(any(User.class))).thenReturn("access-jwt");
+            when(jwtService.generateRefreshToken()).thenReturn("raw-refresh");
+            when(jwtService.hashToken("raw-refresh")).thenReturn("hashed-refresh");
+            when(jwtService.getAccessTokenExpiration()).thenReturn(900L);
+            when(jwtService.getRefreshTokenExpiration()).thenReturn(604800L);
+
+            authService.loginWithGoogle(request);
+
+            assertEquals("blank@example.com", userCaptor.getValue().getName());
+            assertEquals(UserRole.BURUH, userCaptor.getValue().getRole());
+        }
     }
 
     // ── Logout ──────────────────────────────────────────────────────────

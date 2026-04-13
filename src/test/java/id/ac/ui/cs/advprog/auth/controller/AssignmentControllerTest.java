@@ -1,7 +1,9 @@
 package id.ac.ui.cs.advprog.auth.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,6 +22,7 @@ import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentRes
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorUnassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.ReassignmentUserSummaryResponseData;
+import id.ac.ui.cs.advprog.auth.exception.ForbiddenException;
 import id.ac.ui.cs.advprog.auth.service.AssignmentService;
 import id.ac.ui.cs.advprog.auth.service.JwtService;
 import java.time.Instant;
@@ -29,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -95,6 +99,25 @@ class AssignmentControllerTest {
                 .andExpect(jsonPath("$.status").value("error"))
                 .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
     }
+
+        @Test
+        void getAssignmentsReturns403WhenAuthoritiesNull() throws Exception {
+                Authentication auth = org.mockito.Mockito.mock(Authentication.class);
+                when(auth.getAuthorities()).thenReturn(null);
+
+                mockMvc.perform(get("/api/v1/assignments/buruh-mandor").with(authentication(auth)))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("Access denied"));
+        }
+
+        @Test
+        void getAssignmentsDirectCallThrows403WhenAuthenticationNull() {
+                AssignmentController controller = new AssignmentController(assignmentService);
+
+                assertThrows(ForbiddenException.class,
+                                () -> controller.getAssignments(0, 20, null, null, null, null));
+        }
 
     @Test
     void getAssignmentsReturns401WithoutAuth() throws Exception {
