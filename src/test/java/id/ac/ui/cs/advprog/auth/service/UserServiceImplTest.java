@@ -9,13 +9,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
+import id.ac.ui.cs.advprog.auth.dto.response.management.DeletedUserResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
+import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.model.User;
+import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
@@ -48,6 +51,9 @@ class UserServiceImplTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+        @Mock
+        private RefreshTokenRepository refreshTokenRepository;
+
     @Captor
     private ArgumentCaptor<Pageable> pageableCaptor;
 
@@ -55,7 +61,7 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(userRepository, passwordEncoder);
+                userService = new UserServiceImpl(userRepository, refreshTokenRepository, passwordEncoder);
     }
 
     @Test
@@ -80,6 +86,30 @@ class UserServiceImplTest {
         verify(userRepository).findAll(any(Specification.class), pageableCaptor.capture());
         assertEquals("createdAt: DESC", pageableCaptor.getValue().getSort().toString());
     }
+
+        @Test
+        void getDeletedUsersReturnsMappedPage() {
+                User user = User.builder()
+                                .id(UUID.randomUUID())
+                                .username("ahmad-buruh-a1b2")
+                                .email("ahmad@example.com")
+                                .name("Ahmad Buruh")
+                                .role(UserRole.BURUH)
+                                .isActive(false)
+                                .createdAt(Instant.now())
+                                .build();
+
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                                .thenReturn(new PageImpl<>(List.of(user)));
+
+                UserPageResponseData result = userService.getDeletedUsers(0, 20, "createdAt,desc", null, null, null);
+
+                assertEquals(1, result.getContent().size());
+                assertEquals("ahmad@example.com", result.getContent().getFirst().getEmail());
+                assertEquals(false, result.getContent().getFirst().isActive());
+                verify(userRepository).findAll(any(Specification.class), pageableCaptor.capture());
+                assertEquals("createdAt: DESC", pageableCaptor.getValue().getSort().toString());
+        }
 
     @Test
     void getUsersUsesProvidedSort() {
@@ -182,22 +212,26 @@ class UserServiceImplTest {
                 Path namePath = mock(Path.class);
                 Path emailPath = mock(Path.class);
                 Path rolePath = mock(Path.class);
+                Path activePath = mock(Path.class);
                 Expression<String> loweredName = mock(Expression.class);
                 Expression<String> loweredEmail = mock(Expression.class);
 
                 Predicate namePredicate = mock(Predicate.class);
                 Predicate emailPredicate = mock(Predicate.class);
                 Predicate rolePredicate = mock(Predicate.class);
+                Predicate activePredicate = mock(Predicate.class);
                 Predicate combined = mock(Predicate.class);
 
                 when(root.get("name")).thenReturn(namePath);
                 when(root.get("email")).thenReturn(emailPath);
                 when(root.get("role")).thenReturn(rolePath);
+                when(root.get("isActive")).thenReturn(activePath);
                 when(cb.lower(namePath)).thenReturn(loweredName);
                 when(cb.lower(emailPath)).thenReturn(loweredEmail);
                 when(cb.like(loweredName, "%ahmad%")).thenReturn(namePredicate);
                 when(cb.like(loweredEmail, "%ahmad@example.com%")).thenReturn(emailPredicate);
                 when(cb.equal(rolePath, UserRole.BURUH)).thenReturn(rolePredicate);
+                when(cb.isTrue(activePath)).thenReturn(activePredicate);
                 when(cb.and(any(Predicate[].class))).thenReturn(combined);
 
                 Predicate result = specification.toPredicate(root, query, cb);
@@ -206,6 +240,57 @@ class UserServiceImplTest {
                 verify(cb).like(loweredName, "%ahmad%");
                 verify(cb).like(loweredEmail, "%ahmad@example.com%");
                 verify(cb).equal(rolePath, UserRole.BURUH);
+                verify(cb).isTrue(activePath);
+        }
+
+        @Test
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        void getDeletedUsersBuildSpecificationEvaluatesInactivePredicate() {
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                userService.getDeletedUsers(0, 20, "createdAt,desc", "Ahmad", "ahmad@example.com", "BURUH");
+
+                ArgumentCaptor<Specification<User>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+                verify(userRepository).findAll(specCaptor.capture(), any(Pageable.class));
+                Specification<User> specification = specCaptor.getValue();
+
+                Root<User> root = mock(Root.class);
+                CriteriaQuery<?> query = mock(CriteriaQuery.class);
+                CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+                Path namePath = mock(Path.class);
+                Path emailPath = mock(Path.class);
+                Path rolePath = mock(Path.class);
+                Path activePath = mock(Path.class);
+                Expression<String> loweredName = mock(Expression.class);
+                Expression<String> loweredEmail = mock(Expression.class);
+
+                Predicate namePredicate = mock(Predicate.class);
+                Predicate emailPredicate = mock(Predicate.class);
+                Predicate rolePredicate = mock(Predicate.class);
+                Predicate inactivePredicate = mock(Predicate.class);
+                Predicate combined = mock(Predicate.class);
+
+                when(root.get("name")).thenReturn(namePath);
+                when(root.get("email")).thenReturn(emailPath);
+                when(root.get("role")).thenReturn(rolePath);
+                when(root.get("isActive")).thenReturn(activePath);
+                when(cb.lower(namePath)).thenReturn(loweredName);
+                when(cb.lower(emailPath)).thenReturn(loweredEmail);
+                when(cb.like(loweredName, "%ahmad%")).thenReturn(namePredicate);
+                when(cb.like(loweredEmail, "%ahmad@example.com%")).thenReturn(emailPredicate);
+                when(cb.equal(rolePath, UserRole.BURUH)).thenReturn(rolePredicate);
+                when(cb.isFalse(activePath)).thenReturn(inactivePredicate);
+                when(cb.and(any(Predicate[].class))).thenReturn(combined);
+
+                Predicate result = specification.toPredicate(root, query, cb);
+
+                assertEquals(combined, result);
+                verify(cb).like(loweredName, "%ahmad%");
+                verify(cb).like(loweredEmail, "%ahmad@example.com%");
+                verify(cb).equal(rolePath, UserRole.BURUH);
+                verify(cb).isFalse(activePath);
         }
 
     @Test
@@ -311,4 +396,75 @@ class UserServiceImplTest {
 
                 assertEquals("User with id " + userId + " not found", ex.getMessage());
         }
+
+    @Test
+    void deleteUserSoftDeletesAndRemovesTokens() {
+        UUID targetUserId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        User user = User.builder()
+                .id(targetUserId)
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh")
+                .isActive(true)
+                .build();
+
+        when(userRepository.findById(targetUserId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DeletedUserResponseData response = userService.deleteUser(targetUserId, adminId);
+
+        assertEquals(targetUserId, response.getId());
+        assertEquals("ahmad@example.com", response.getEmail());
+        assertEquals("Ahmad Buruh", response.getName());
+        verify(refreshTokenRepository).deleteAllByUser(user);
+    }
+
+    @Test
+    void deleteUserThrowsWhenAdminDeletesSelf() {
+        UUID targetUserId = UUID.randomUUID();
+        User user = User.builder()
+                .id(targetUserId)
+                .isActive(true)
+                .build();
+        when(userRepository.findById(targetUserId)).thenReturn(Optional.of(user));
+
+        UnprocessableEntityException ex = assertThrows(
+                UnprocessableEntityException.class,
+                () -> userService.deleteUser(targetUserId, targetUserId)
+        );
+
+        assertEquals("Admin cannot delete their own account", ex.getMessage());
+    }
+
+    @Test
+    void deleteUserThrowsWhenTargetMissing() {
+        UUID targetUserId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        when(userRepository.findById(targetUserId)).thenReturn(Optional.empty());
+
+        UserNotFoundException ex = assertThrows(
+                UserNotFoundException.class,
+                () -> userService.deleteUser(targetUserId, adminId)
+        );
+
+        assertEquals("User with id " + targetUserId + " not found", ex.getMessage());
+    }
+
+    @Test
+    void deleteUserThrowsWhenTargetAlreadyInactive() {
+        UUID targetUserId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        User user = User.builder()
+                .id(targetUserId)
+                .isActive(false)
+                .build();
+        when(userRepository.findById(targetUserId)).thenReturn(Optional.of(user));
+
+        UserNotFoundException ex = assertThrows(
+                UserNotFoundException.class,
+                () -> userService.deleteUser(targetUserId, adminId)
+        );
+
+        assertEquals("User with id " + targetUserId + " not found", ex.getMessage());
+    }
 }

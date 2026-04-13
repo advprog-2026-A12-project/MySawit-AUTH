@@ -4,8 +4,8 @@ import id.ac.ui.cs.advprog.auth.dto.request.auth.LoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.LogoutRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RefreshTokenRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RegisterRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.GoogleLoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginResponseData;
-import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginUserDto;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.RegisterResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.TokenRefreshResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
@@ -33,6 +33,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtService jwtService;
+    private final GoogleOAuthService googleOAuthService;
     private final PasswordEncoder passwordEncoder;
 
     private final SecureRandom secureRandom = new SecureRandom();
@@ -91,17 +92,75 @@ public class AuthServiceImpl implements AuthService {
             throw new UnauthorizedException("Invalid email or password");
         }
 
+        return issueLoginTokens(user);
+    }
+
+    @Override
+    @Transactional
+    public LoginResponseData loginWithGoogle(GoogleLoginRequest request) {
+        GoogleUserInfo googleUserInfo = googleOAuthService.authenticate(
+                request.getAuthorizationCode(),
+                request.getRedirectUri());
+
+        User user = userRepository
+                .findByOauthProviderAndOauthProviderId("GOOGLE", googleUserInfo.providerUserId())
+                .orElseGet(() -> findOrCreateGoogleUser(googleUserInfo));
+
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Account is deactivated");
+        }
+
+        return issueLoginTokens(user);
+    }
+
+    private User findOrCreateGoogleUser(GoogleUserInfo googleUserInfo) {
+        return userRepository.findByEmail(googleUserInfo.email())
+                .map(existingUser -> linkGoogleAccount(existingUser, googleUserInfo))
+                .orElseGet(() -> createGoogleUser(googleUserInfo));
+    }
+
+    private User linkGoogleAccount(User existingUser, GoogleUserInfo googleUserInfo) {
+        if (existingUser.getOauthProvider() == null || existingUser.getOauthProvider().isBlank()) {
+            existingUser.setOauthProvider("GOOGLE");
+            existingUser.setOauthProviderId(googleUserInfo.providerUserId());
+            return userRepository.save(existingUser);
+        }
+
+        boolean sameProvider = "GOOGLE".equalsIgnoreCase(existingUser.getOauthProvider());
+        boolean sameProviderUserId = googleUserInfo.providerUserId()
+                .equals(existingUser.getOauthProviderId());
+        if (!sameProvider || !sameProviderUserId) {
+            throw new UnauthorizedException("Google account is not linked to this user");
+        }
+
+        return existingUser;
+    }
+
+    private User createGoogleUser(GoogleUserInfo googleUserInfo) {
+        String name = (googleUserInfo.name() == null || googleUserInfo.name().isBlank())
+                ? googleUserInfo.email()
+                : googleUserInfo.name();
+        String username = generateUniqueUsername(name);
+
+        User user = User.builder()
+                .username(username)
+                .email(googleUserInfo.email())
+                .name(name)
+                .passwordHash(null)
+                .role(UserRole.BURUH)
+                .oauthProvider("GOOGLE")
+                .oauthProviderId(googleUserInfo.providerUserId())
+                .isActive(true)
+                .build();
+
+        return userRepository.save(user);
+    }
+
+    private LoginResponseData issueLoginTokens(User user) {
         String accessToken = jwtService.generateAccessToken(user);
         String rawRefreshToken = jwtService.generateRefreshToken();
 
         persistRefreshToken(user, rawRefreshToken);
-
-        LoginUserDto userDto = LoginUserDto.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .name(user.getName())
-                .role(user.getRole().name())
-                .build();
 
         return LoginResponseData.builder()
                 .accessToken(accessToken)

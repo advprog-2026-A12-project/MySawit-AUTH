@@ -2,11 +2,6 @@ package id.ac.ui.cs.advprog.auth.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -19,6 +14,7 @@ import id.ac.ui.cs.advprog.auth.dto.request.auth.LoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.LogoutRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RefreshTokenRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RegisterRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.GoogleLoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginUserDto;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.RegisterResponseData;
@@ -182,6 +178,48 @@ class AuthControllerTest {
                     .andExpect(jsonPath("$.message").value("Invalid email or password"));
         }
     }
+
+        @Nested
+        class GoogleLoginTests {
+
+                @Test
+                void loginWithGoogleReturns200OnSuccess() throws Exception {
+                        GoogleLoginRequest request = GoogleLoginRequest.builder()
+                                        .authorizationCode("google-auth-code")
+                                        .redirectUri("postmessage")
+                                        .build();
+
+                        LoginResponseData responseData = LoginResponseData.builder()
+                                        .accessToken("jwt-access-token")
+                                        .refreshToken("raw-refresh-token")
+                                        .tokenType("Bearer")
+                                        .expiresIn(900)
+                                        .build();
+
+                        when(authService.loginWithGoogle(any(GoogleLoginRequest.class))).thenReturn(responseData);
+
+                        mockMvc.perform(post("/api/v1/auth/google")
+                                                        .contentType(MediaType.APPLICATION_JSON)
+                                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.status").value("success"))
+                                        .andExpect(jsonPath("$.message").value("Google login successful"))
+                                        .andExpect(jsonPath("$.data.accessToken").value("jwt-access-token"));
+                }
+
+                @Test
+                void loginWithGoogleReturns400WhenCodeMissing() throws Exception {
+                        String invalidPayload = "{\"authorizationCode\":\"\"}";
+
+                        mockMvc.perform(post("/api/v1/auth/google")
+                                                        .contentType(MediaType.APPLICATION_JSON)
+                                                        .content(invalidPayload))
+                                        .andExpect(status().isBadRequest())
+                                        .andExpect(jsonPath("$.status").value("error"))
+                                        .andExpect(jsonPath("$.field").exists())
+                                        .andExpect(jsonPath("$.message").exists());
+                }
+        }
 
     // ── Logout ──────────────────────────────────────────────────────────
 

@@ -1,15 +1,19 @@
 package id.ac.ui.cs.advprog.auth.service;
 
 import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
+import id.ac.ui.cs.advprog.auth.dto.response.management.DeletedUserResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
+import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.model.User;
+import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
+import java.time.Instant;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +36,7 @@ public class UserServiceImpl implements UserService {
     private static final List<String> ALLOWED_SORT_FIELDS = List.of("name", "email", "role", "createdAt");
 
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -40,7 +45,32 @@ public class UserServiceImpl implements UserService {
         validatePageParams(page, size);
 
         Pageable pageable = PageRequest.of(page, size, parseSort(sort));
-        Specification<User> specification = buildSpecification(name, email, role);
+        Specification<User> specification = buildSpecification(name, email, role, true);
+
+        Page<User> usersPage = userRepository.findAll(specification, pageable);
+
+        List<UserSummaryResponseData> content = usersPage.getContent().stream()
+            .map(this::toSummaryResponse)
+            .toList();
+
+        return UserPageResponseData.builder()
+            .content(content)
+            .page(usersPage.getNumber())
+            .size(usersPage.getSize())
+            .totalElements(usersPage.getTotalElements())
+            .totalPages(usersPage.getTotalPages())
+            .first(usersPage.isFirst())
+            .last(usersPage.isLast())
+            .build();
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public UserPageResponseData getDeletedUsers(int page, int size, String sort, String name, String email, String role) {
+        validatePageParams(page, size);
+
+        Pageable pageable = PageRequest.of(page, size, parseSort(sort));
+        Specification<User> specification = buildSpecification(name, email, role, false);
 
         Page<User> usersPage = userRepository.findAll(specification, pageable);
 
@@ -78,6 +108,32 @@ public class UserServiceImpl implements UserService {
                 .updatedAt(user.getUpdatedAt())
                 .build();
             }
+
+    @Override
+    @Transactional
+    public DeletedUserResponseData deleteUser(UUID userId, UUID authenticatedAdminId) {
+        User user = userRepository.findById(userId)
+                .filter(User::isActive)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (userId.equals(authenticatedAdminId)) {
+            throw new UnprocessableEntityException("Admin cannot delete their own account");
+        }
+
+        user.setActive(false);
+        Instant deletedAt = Instant.now();
+        user.setUpdatedAt(deletedAt);
+
+        User saved = userRepository.save(user);
+        refreshTokenRepository.deleteAllByUser(saved);
+
+        return DeletedUserResponseData.builder()
+                .id(saved.getId())
+                .email(saved.getEmail())
+                .name(saved.getName())
+                .deletedAt(deletedAt)
+                .build();
+    }
 
     @Override
     @Transactional
@@ -150,11 +206,16 @@ public class UserServiceImpl implements UserService {
         return Sort.by(direction, field);
     }
 
-    private Specification<User> buildSpecification(String name, String email, String role) {
+        private Specification<User> buildSpecification(String name, String email, String role, boolean activeOnly) {
         UserRole parsedRole = parseRole(role);
 
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            Predicate activePredicate = activeOnly
+                ? cb.isTrue(root.get("isActive"))
+                : cb.isFalse(root.get("isActive"));
+            predicates.add(activePredicate);
 
             if (name != null && !name.isBlank()) {
                 predicates.add(cb.like(
