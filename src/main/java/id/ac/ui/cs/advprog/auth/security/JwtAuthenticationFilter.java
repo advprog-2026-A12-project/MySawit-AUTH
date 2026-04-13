@@ -42,19 +42,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        Claims claims = jwtService.extractAllClaims(token);
-        UUID userId = UUID.fromString(claims.getSubject());
-        String role = claims.get("role", String.class);
+        try {
+            Claims claims = jwtService.extractAllClaims(token);
+            UUID userId = UUID.fromString(claims.getSubject());
+            String role = claims.get("role", String.class);
 
-        List<SimpleGrantedAuthority> authorities = List.of(
-                new SimpleGrantedAuthority("ROLE_" + role)
-        );
+            if (role == null || role.isBlank()) {
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
 
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userId, null, authorities);
-        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            List<SimpleGrantedAuthority> authorities = List.of(
+                    new SimpleGrantedAuthority("ROLE_" + role)
+            );
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(userId, null, authorities);
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        } catch (RuntimeException ex) {
+            // Treat malformed claims as unauthenticated instead of surfacing 500.
+            SecurityContextHolder.clearContext();
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         filterChain.doFilter(request, response);
     }
