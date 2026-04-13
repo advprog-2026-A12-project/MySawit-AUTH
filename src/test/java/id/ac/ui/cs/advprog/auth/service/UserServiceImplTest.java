@@ -3,8 +3,10 @@ package id.ac.ui.cs.advprog.auth.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -143,6 +145,16 @@ class UserServiceImplTest {
     }
 
         @Test
+        void getUsersThrowsOnPageSizeAboveLimit() {
+                InvalidUserRequestException ex = assertThrows(
+                                InvalidUserRequestException.class,
+                                () -> userService.getUsers(0, 101, "createdAt,desc", null, null, null)
+                );
+
+                assertEquals("size must be between 1 and 100", ex.getMessage());
+        }
+
+        @Test
         void getUsersThrowsOnNegativePage() {
                 InvalidUserRequestException ex = assertThrows(
                                 InvalidUserRequestException.class,
@@ -188,6 +200,17 @@ class UserServiceImplTest {
                                 .thenReturn(new PageImpl<>(List.of()));
 
                 userService.getUsers(0, 10, "  ", null, null, null);
+
+                verify(userRepository).findAll(any(Specification.class), pageableCaptor.capture());
+                assertEquals("createdAt: DESC", pageableCaptor.getValue().getSort().toString());
+        }
+
+        @Test
+        void getUsersUsesDefaultSortWhenNull() {
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                userService.getUsers(0, 10, null, null, null, null);
 
                 verify(userRepository).findAll(any(Specification.class), pageableCaptor.capture());
                 assertEquals("createdAt: DESC", pageableCaptor.getValue().getSort().toString());
@@ -241,6 +264,70 @@ class UserServiceImplTest {
                 verify(cb).like(loweredEmail, "%ahmad@example.com%");
                 verify(cb).equal(rolePath, UserRole.BURUH);
                 verify(cb).isTrue(activePath);
+        }
+
+        @Test
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        void getUsersBuildSpecificationWithoutOptionalFilters() {
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                userService.getUsers(0, 20, "createdAt,desc", null, null, "   ");
+
+                ArgumentCaptor<Specification<User>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+                verify(userRepository).findAll(specCaptor.capture(), any(Pageable.class));
+                Specification<User> specification = specCaptor.getValue();
+
+                Root<User> root = mock(Root.class);
+                CriteriaQuery<?> query = mock(CriteriaQuery.class);
+                CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+                Path activePath = mock(Path.class);
+                Predicate activePredicate = mock(Predicate.class);
+                Predicate combined = mock(Predicate.class);
+
+                when(root.get("isActive")).thenReturn(activePath);
+                when(cb.isTrue(activePath)).thenReturn(activePredicate);
+                when(cb.and(any(Predicate[].class))).thenReturn(combined);
+
+                Predicate result = specification.toPredicate(root, query, cb);
+
+                assertEquals(combined, result);
+                verify(cb).isTrue(activePath);
+                verify(cb, never()).like(any(), anyString());
+                verify(cb, never()).equal(any(), any());
+        }
+
+        @Test
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        void getUsersBuildSpecificationSkipsBlankNameAndEmail() {
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                userService.getUsers(0, 20, "createdAt,desc", "   ", "   ", null);
+
+                ArgumentCaptor<Specification<User>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+                verify(userRepository).findAll(specCaptor.capture(), any(Pageable.class));
+                Specification<User> specification = specCaptor.getValue();
+
+                Root<User> root = mock(Root.class);
+                CriteriaQuery<?> query = mock(CriteriaQuery.class);
+                CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+                Path activePath = mock(Path.class);
+                Predicate activePredicate = mock(Predicate.class);
+                Predicate combined = mock(Predicate.class);
+
+                when(root.get("isActive")).thenReturn(activePath);
+                when(cb.isTrue(activePath)).thenReturn(activePredicate);
+                when(cb.and(any(Predicate[].class))).thenReturn(combined);
+
+                Predicate result = specification.toPredicate(root, query, cb);
+
+                assertEquals(combined, result);
+                verify(cb).isTrue(activePath);
+                verify(cb, never()).like(any(), anyString());
+                verify(cb, never()).equal(any(), any());
         }
 
         @Test
@@ -362,6 +449,59 @@ class UserServiceImplTest {
     }
 
     @Test
+    void updateMyProfileUpdatesOnlyName() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .username("ahmad-buruh-a1b2")
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh")
+                .role(UserRole.BURUH)
+                .passwordHash("old-hash")
+                .isActive(true)
+                .build();
+
+        UpdateMyProfileRequest request = UpdateMyProfileRequest.builder()
+                .name("Name Only")
+                .build();
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatedMyProfileResponseData response = userService.updateMyProfile(userId, request);
+
+        assertEquals("Name Only", response.getName());
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+    @Test
+    void updateMyProfileUpdatesOnlyPassword() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .username("ahmad-buruh-a1b2")
+                .email("ahmad@example.com")
+                .name("Original Name")
+                .role(UserRole.BURUH)
+                .passwordHash("old-hash")
+                .isActive(true)
+                .build();
+
+        UpdateMyProfileRequest request = UpdateMyProfileRequest.builder()
+                .password("NewSecureP@ss456")
+                .build();
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("NewSecureP@ss456")).thenReturn("encoded-password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatedMyProfileResponseData response = userService.updateMyProfile(userId, request);
+
+        assertEquals("Original Name", response.getName());
+        verify(passwordEncoder).encode("NewSecureP@ss456");
+    }
+
+    @Test
     void updateMyProfileThrowsWhenNoFieldsProvided() {
         UUID userId = UUID.randomUUID();
         User user = User.builder()
@@ -380,6 +520,31 @@ class UserServiceImplTest {
                 () -> userService.updateMyProfile(userId, request));
 
         assertEquals("At least one of name or password must be provided", ex.getMessage());
+    }
+
+    @Test
+    void updateMyProfileThrowsWhenFieldsAreBlank() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .username("ahmad-buruh-a1b2")
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh")
+                .role(UserRole.BURUH)
+                .isActive(true)
+                .build();
+
+        UpdateMyProfileRequest request = UpdateMyProfileRequest.builder()
+                .name("   ")
+                .password("   ")
+                .build();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class,
+                () -> userService.updateMyProfile(userId, request));
+
+        assertEquals("At least one of name or password must be provided", ex.getMessage());
+        verify(passwordEncoder, never()).encode(anyString());
     }
 
         @Test
