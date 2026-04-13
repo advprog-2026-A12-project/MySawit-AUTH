@@ -45,7 +45,32 @@ public class UserServiceImpl implements UserService {
         validatePageParams(page, size);
 
         Pageable pageable = PageRequest.of(page, size, parseSort(sort));
-        Specification<User> specification = buildSpecification(name, email, role);
+        Specification<User> specification = buildSpecification(name, email, role, true);
+
+        Page<User> usersPage = userRepository.findAll(specification, pageable);
+
+        List<UserSummaryResponseData> content = usersPage.getContent().stream()
+            .map(this::toSummaryResponse)
+            .toList();
+
+        return UserPageResponseData.builder()
+            .content(content)
+            .page(usersPage.getNumber())
+            .size(usersPage.getSize())
+            .totalElements(usersPage.getTotalElements())
+            .totalPages(usersPage.getTotalPages())
+            .first(usersPage.isFirst())
+            .last(usersPage.isLast())
+            .build();
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public UserPageResponseData getDeletedUsers(int page, int size, String sort, String name, String email, String role) {
+        validatePageParams(page, size);
+
+        Pageable pageable = PageRequest.of(page, size, parseSort(sort));
+        Specification<User> specification = buildSpecification(name, email, role, false);
 
         Page<User> usersPage = userRepository.findAll(specification, pageable);
 
@@ -181,13 +206,16 @@ public class UserServiceImpl implements UserService {
         return Sort.by(direction, field);
     }
 
-    private Specification<User> buildSpecification(String name, String email, String role) {
+        private Specification<User> buildSpecification(String name, String email, String role, boolean activeOnly) {
         UserRole parsedRole = parseRole(role);
 
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            predicates.add(cb.isTrue(root.get("isActive")));
+            Predicate activePredicate = activeOnly
+                ? cb.isTrue(root.get("isActive"))
+                : cb.isFalse(root.get("isActive"));
+            predicates.add(activePredicate);
 
             if (name != null && !name.isBlank()) {
                 predicates.add(cb.like(

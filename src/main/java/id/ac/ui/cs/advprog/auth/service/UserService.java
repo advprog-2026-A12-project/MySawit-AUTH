@@ -11,6 +11,8 @@ public interface UserService {
 
     UserPageResponseData getUsers(int page, int size, String sort, String name, String email, String role);
 
+    UserPageResponseData getDeletedUsers(int page, int size, String sort, String name, String email, String role);
+
     UserDetailResponseData getUserById(UUID userId);
 
     DeletedUserResponseData deleteUser(UUID userId, UUID authenticatedAdminId);
