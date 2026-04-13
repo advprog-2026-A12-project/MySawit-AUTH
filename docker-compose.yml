@@ -36,6 +36,9 @@ services:
       DB_USER_DEV: ${POSTGRES_USER:-postgres}
       DB_PASSWORD_DEV: ${POSTGRES_PASSWORD:-postgres}
       JWT_SECRET: ${JWT_SECRET:-secret}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-postmessage}
       
 
 volumes:

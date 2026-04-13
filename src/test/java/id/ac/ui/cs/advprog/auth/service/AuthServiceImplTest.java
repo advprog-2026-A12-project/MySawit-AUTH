@@ -13,6 +13,7 @@ import id.ac.ui.cs.advprog.auth.dto.request.auth.LoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.LogoutRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RefreshTokenRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RegisterRequest;
+import id.ac.ui.cs.advprog.auth.dto.request.auth.GoogleLoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.RegisterResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.TokenRefreshResponseData;
@@ -46,6 +47,7 @@ class AuthServiceImplTest {
     @Mock private UserRepository userRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private JwtService jwtService;
+        @Mock private GoogleOAuthService googleOAuthService;
     @Mock private PasswordEncoder passwordEncoder;
 
     @InjectMocks private AuthServiceImpl authService;
@@ -339,6 +341,83 @@ class AuthServiceImplTest {
 
             assertThrows(UnauthorizedException.class,
                     () -> authService.login(request));
+        }
+    }
+
+    @Nested
+    class GoogleLoginTests {
+
+        @Test
+        void loginWithGoogleCreatesUserWhenNotFound() {
+            GoogleLoginRequest request = GoogleLoginRequest.builder()
+                    .authorizationCode("google-auth-code")
+                    .redirectUri("postmessage")
+                    .build();
+            GoogleUserInfo googleUserInfo = new GoogleUserInfo(
+                    "google-sub-123",
+                    "google.user@example.com",
+                    "Google User"
+            );
+
+            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+                    .thenReturn(googleUserInfo);
+            when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-123"))
+                    .thenReturn(Optional.empty());
+            when(userRepository.findByEmail("google.user@example.com"))
+                    .thenReturn(Optional.empty());
+            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            when(jwtService.generateAccessToken(any(User.class))).thenReturn("access-jwt");
+            when(jwtService.generateRefreshToken()).thenReturn("raw-refresh");
+            when(jwtService.hashToken("raw-refresh")).thenReturn("hashed-refresh");
+            when(jwtService.getAccessTokenExpiration()).thenReturn(900L);
+            when(jwtService.getRefreshTokenExpiration()).thenReturn(604800L);
+
+            LoginResponseData result = authService.loginWithGoogle(request);
+
+            assertEquals("access-jwt", result.getAccessToken());
+            assertEquals("raw-refresh", result.getRefreshToken());
+            verify(userRepository).save(any(User.class));
+            verify(refreshTokenRepository).save(any(RefreshToken.class));
+        }
+
+        @Test
+        void loginWithGoogleLinksExistingEmailUser() {
+            GoogleLoginRequest request = GoogleLoginRequest.builder()
+                    .authorizationCode("google-auth-code")
+                    .redirectUri("postmessage")
+                    .build();
+            GoogleUserInfo googleUserInfo = new GoogleUserInfo(
+                    "google-sub-999",
+                    "ahmad@example.com",
+                    "Ahmad Buruh"
+            );
+
+            sampleUser.setOauthProvider(null);
+            sampleUser.setOauthProviderId(null);
+
+            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+                    .thenReturn(googleUserInfo);
+            when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-999"))
+                    .thenReturn(Optional.empty());
+            when(userRepository.findByEmail("ahmad@example.com"))
+                    .thenReturn(Optional.of(sampleUser));
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            when(jwtService.generateAccessToken(any(User.class))).thenReturn("access-jwt");
+            when(jwtService.generateRefreshToken()).thenReturn("raw-refresh");
+            when(jwtService.hashToken("raw-refresh")).thenReturn("hashed-refresh");
+            when(jwtService.getAccessTokenExpiration()).thenReturn(900L);
+            when(jwtService.getRefreshTokenExpiration()).thenReturn(604800L);
+
+            LoginResponseData result = authService.loginWithGoogle(request);
+
+            assertEquals("access-jwt", result.getAccessToken());
+            assertEquals("GOOGLE", sampleUser.getOauthProvider());
+            assertEquals("google-sub-999", sampleUser.getOauthProviderId());
+            verify(userRepository).save(sampleUser);
+            verify(refreshTokenRepository).save(any(RefreshToken.class));
         }
     }
 
