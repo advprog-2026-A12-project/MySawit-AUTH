@@ -19,11 +19,14 @@ import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
+import id.ac.ui.cs.advprog.auth.model.BuruhMandorAssignment;
 import id.ac.ui.cs.advprog.auth.model.User;
+import id.ac.ui.cs.advprog.auth.repository.BuruhMandorAssignmentRepository;
 import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -41,6 +44,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -56,6 +60,9 @@ class UserServiceImplTest {
         @Mock
         private RefreshTokenRepository refreshTokenRepository;
 
+        @Mock
+        private BuruhMandorAssignmentRepository buruhMandorAssignmentRepository;
+
     @Captor
     private ArgumentCaptor<Pageable> pageableCaptor;
 
@@ -63,7 +70,12 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-                userService = new UserServiceImpl(userRepository, refreshTokenRepository, passwordEncoder);
+                userService = new UserServiceImpl(
+                                userRepository,
+                                refreshTokenRepository,
+                                buruhMandorAssignmentRepository,
+                                passwordEncoder
+                );
     }
 
     @Test
@@ -396,6 +408,7 @@ class UserServiceImplTest {
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(buruhMandorAssignmentRepository.findByBuruhIdAndIsActiveTrue(userId)).thenReturn(Optional.empty());
 
         UserDetailResponseData detail = userService.getUserById(userId);
 
@@ -403,6 +416,123 @@ class UserServiceImplTest {
         assertEquals("ahmad@example.com", detail.getEmail());
         assertEquals("BURUH", detail.getRole());
         assertEquals("GOOGLE", detail.getOauthProvider());
+        assertEquals(Map.of(), detail.getRoleSpecificData());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getUserByIdForBuruhIncludesAssignedMandorData() {
+        UUID userId = UUID.randomUUID();
+        UUID mandorId = UUID.randomUUID();
+        Instant assignedAt = Instant.now();
+
+        User buruh = User.builder()
+                .id(userId)
+                .username("ahmad-buruh-a1b2")
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh")
+                .role(UserRole.BURUH)
+                .isActive(true)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        User mandor = User.builder()
+                .id(mandorId)
+                .username("budi-mandor-e5f6")
+                .email("budi@example.com")
+                .name("Budi Mandor")
+                .role(UserRole.MANDOR)
+                .isActive(true)
+                .build();
+
+        BuruhMandorAssignment assignment = BuruhMandorAssignment.builder()
+                .buruh(buruh)
+                .mandor(mandor)
+                .isActive(true)
+                .assignedAt(assignedAt)
+                .build();
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(buruh));
+        when(buruhMandorAssignmentRepository.findByBuruhIdAndIsActiveTrue(userId)).thenReturn(Optional.of(assignment));
+
+        UserDetailResponseData detail = userService.getUserById(userId);
+        Map<String, Object> assignedMandor = (Map<String, Object>) detail.getRoleSpecificData().get("assignedMandor");
+
+        assertEquals(mandorId, assignedMandor.get("id"));
+        assertEquals("Budi Mandor", assignedMandor.get("name"));
+        assertEquals("budi@example.com", assignedMandor.get("email"));
+        assertEquals(assignedAt, detail.getRoleSpecificData().get("assignedAt"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getUserByIdForMandorIncludesAllAssignedBuruhsFromAssignments() {
+        UUID mandorId = UUID.randomUUID();
+        UUID buruh1Id = UUID.randomUUID();
+        UUID buruh2Id = UUID.randomUUID();
+
+        Instant assignedAt1 = Instant.now().minusSeconds(3600);
+        Instant assignedAt2 = Instant.now();
+
+        User mandor = User.builder()
+                .id(mandorId)
+                .username("budi-mandor-e5f6")
+                .email("budi@example.com")
+                .name("Budi Mandor")
+                .role(UserRole.MANDOR)
+                .isActive(true)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        User buruh1 = User.builder()
+                .id(buruh1Id)
+                .username("ahmad-buruh-a1b2")
+                .email("ahmad@example.com")
+                .name("Ahmad Buruh")
+                .role(UserRole.BURUH)
+                .isActive(true)
+                .build();
+
+        User buruh2 = User.builder()
+                .id(buruh2Id)
+                .username("doni-buruh-c3d4")
+                .email("doni@example.com")
+                .name("Doni Buruh")
+                .role(UserRole.BURUH)
+                .isActive(true)
+                .build();
+
+        BuruhMandorAssignment assignment1 = BuruhMandorAssignment.builder()
+                .buruh(buruh1)
+                .mandor(mandor)
+                .isActive(true)
+                .assignedAt(assignedAt1)
+                .build();
+
+        BuruhMandorAssignment assignment2 = BuruhMandorAssignment.builder()
+                .buruh(buruh2)
+                .mandor(mandor)
+                .isActive(true)
+                .assignedAt(assignedAt2)
+                .build();
+
+        when(userRepository.findById(mandorId)).thenReturn(Optional.of(mandor));
+        when(buruhMandorAssignmentRepository.findAllByMandor_IdAndIsActiveTrue(eq(mandorId), any(Sort.class)))
+                .thenReturn(List.of(assignment2, assignment1));
+
+        UserDetailResponseData detail = userService.getUserById(mandorId);
+
+        List<Map<String, Object>> assignedBuruhs =
+                (List<Map<String, Object>>) detail.getRoleSpecificData().get("assignedBuruhs");
+
+        assertEquals(2, assignedBuruhs.size());
+        assertEquals(2, detail.getRoleSpecificData().get("totalAssignedBuruhs"));
+        assertEquals(buruh2Id, assignedBuruhs.getFirst().get("id"));
+        assertEquals("Doni Buruh", assignedBuruhs.getFirst().get("name"));
+        assertEquals("doni@example.com", assignedBuruhs.getFirst().get("email"));
+        assertEquals(assignedAt2, assignedBuruhs.getFirst().get("assignedAt"));
     }
 
     @Test
