@@ -47,5 +47,5 @@ data/
 .env.prod
 
 
-api-docs-container1-auth.md
+api-auth.md
 database-design.md
