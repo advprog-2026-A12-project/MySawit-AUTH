@@ -91,7 +91,58 @@ class UserControllerTest {
                         .with(user("buruh").roles("BURUH")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value("error"))
-                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+                .andExpect(jsonPath("$.message").value("Only ADMIN or MANDOR can access this resource"));
+    }
+
+    @Test
+    void getUsersReturns200ForMandorWhenRoleSupirTruk() throws Exception {
+        UserSummaryResponseData user = UserSummaryResponseData.builder()
+                .id(UUID.randomUUID())
+                .username("charlie-supir-g7h8")
+                .email("charlie@example.com")
+                .name("Charlie Supir")
+                .role("SUPIR_TRUK")
+                .isActive(true)
+                .createdAt(Instant.now())
+                .build();
+
+        UserPageResponseData page = UserPageResponseData.builder()
+                .content(List.of(user))
+                .page(0)
+                .size(20)
+                .totalElements(1)
+                .totalPages(1)
+                .first(true)
+                .last(true)
+                .build();
+
+        when(userService.getUsers(anyInt(), anyInt(), anyString(), isNull(), isNull(), eq("SUPIR_TRUK")))
+                .thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/users?role=SUPIR_TRUK")
+                        .with(user(UUID.randomUUID().toString()).roles("MANDOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("Users retrieved successfully"))
+                .andExpect(jsonPath("$.data.content[0].role").value("SUPIR_TRUK"));
+    }
+
+    @Test
+    void getUsersReturns403ForMandorWhenRoleIsNotSupirTruk() throws Exception {
+        mockMvc.perform(get("/api/v1/users?role=BURUH")
+                        .with(user(UUID.randomUUID().toString()).roles("MANDOR")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value("error"))
+                .andExpect(jsonPath("$.message").value("MANDOR can only access users with role SUPIR_TRUK"));
+    }
+
+    @Test
+    void getUsersReturns403ForMandorWhenRoleIsMissing() throws Exception {
+        mockMvc.perform(get("/api/v1/users")
+                        .with(user(UUID.randomUUID().toString()).roles("MANDOR")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value("error"))
+                .andExpect(jsonPath("$.message").value("MANDOR can only access users with role SUPIR_TRUK"));
     }
 
     @Test
@@ -100,6 +151,44 @@ class UserControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value("error"));
     }
+
+        @Test
+        void getAllUsersForMandorReturns200ForMandor() throws Exception {
+                UserSummaryResponseData user = UserSummaryResponseData.builder()
+                                .id(UUID.randomUUID())
+                                .username("ahmad-buruh-a1b2")
+                                .email("ahmad@example.com")
+                                .name("Ahmad Buruh")
+                                .role("BURUH")
+                                .isActive(true)
+                                .createdAt(Instant.now())
+                                .build();
+
+                when(userService.getAllUsersForMandor()).thenReturn(List.of(user));
+
+                mockMvc.perform(get("/api/v1/users/mandor/all")
+                                                .with(user(UUID.randomUUID().toString()).roles("MANDOR")))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.status").value("success"))
+                                .andExpect(jsonPath("$.message").value("Users retrieved successfully"))
+                                .andExpect(jsonPath("$.data[0].email").value("ahmad@example.com"));
+        }
+
+        @Test
+        void getAllUsersForMandorReturns403ForNonMandor() throws Exception {
+                mockMvc.perform(get("/api/v1/users/mandor/all")
+                                                .with(user(UUID.randomUUID().toString()).roles("ADMIN")))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("Only MANDOR can access this resource"));
+        }
+
+        @Test
+        void getAllUsersForMandorReturns401WithoutAuth() throws Exception {
+                mockMvc.perform(get("/api/v1/users/mandor/all"))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.status").value("error"));
+        }
 
         @Test
         void getUserByIdReturns200ForAdmin() throws Exception {

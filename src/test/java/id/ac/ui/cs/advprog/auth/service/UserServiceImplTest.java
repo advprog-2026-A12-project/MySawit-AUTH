@@ -13,6 +13,7 @@ import id.ac.ui.cs.advprog.auth.dto.response.management.DeletedUserResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
@@ -153,6 +154,38 @@ class UserServiceImplTest {
 
         assertEquals("size must be between 1 and 100", ex.getMessage());
     }
+
+        @Test
+        void getAllUsersForMandorReturnsAllActiveUsers() {
+                User user1 = User.builder()
+                                .id(UUID.randomUUID())
+                                .username("ahmad-buruh-a1b2")
+                                .email("ahmad@example.com")
+                                .name("Ahmad Buruh")
+                                .role(UserRole.BURUH)
+                                .isActive(true)
+                                .createdAt(Instant.now())
+                                .build();
+
+                User user2 = User.builder()
+                                .id(UUID.randomUUID())
+                                .username("budi-mandor-c3d4")
+                                .email("budi@example.com")
+                                .name("Budi Mandor")
+                                .role(UserRole.MANDOR)
+                                .isActive(true)
+                                .createdAt(Instant.now())
+                                .build();
+
+                when(userRepository.findAllByIsActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of(user1, user2));
+
+                List<UserSummaryResponseData> result = userService.getAllUsersForMandor();
+
+                assertEquals(2, result.size());
+                assertEquals("ahmad@example.com", result.getFirst().getEmail());
+                assertEquals("budi@example.com", result.get(1).getEmail());
+                verify(userRepository).findAllByIsActiveTrueOrderByCreatedAtDesc();
+        }
 
         @Test
         void getUsersThrowsOnNegativePage() {
