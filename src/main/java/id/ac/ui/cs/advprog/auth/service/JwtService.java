@@ -34,6 +34,7 @@ public class JwtService {
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
     }
+    
     public String generateAccessToken(User user) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenExpiration * 1000);

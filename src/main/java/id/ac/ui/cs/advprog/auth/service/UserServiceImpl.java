@@ -93,6 +93,14 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserSummaryResponseData> getAllUsersForMandor() {
+        return userRepository.findAllByIsActiveTrueOrderByCreatedAtDesc().stream()
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
             @Override
             @Transactional(readOnly = true)
             public UserDetailResponseData getUserById(UUID userId) {

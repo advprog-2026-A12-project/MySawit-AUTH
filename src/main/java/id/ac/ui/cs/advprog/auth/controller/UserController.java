@@ -6,9 +6,11 @@ import id.ac.ui.cs.advprog.auth.dto.response.management.DeletedUserResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.exception.ForbiddenException;
 import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.service.UserService;
+import java.util.List;
 import java.util.UUID;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,9 +45,17 @@ public class UserController {
             @RequestParam(required = false) String role,
             Authentication authentication
     ) {
-        enforceAdminOnly(authentication);
+        String resolvedRoleFilter = enforceAdminOrMandorUsersAccess(authentication, role);
 
-        UserPageResponseData data = userService.getUsers(page, size, sort, name, email, role);
+        UserPageResponseData data = userService.getUsers(page, size, sort, name, email, resolvedRoleFilter);
+        return ResponseEntity.ok(BaseResponse.success("Users retrieved successfully", data));
+    }
+
+    @GetMapping("/mandor/all")
+    public ResponseEntity<BaseResponse<List<UserSummaryResponseData>>> getAllUsersForMandor(Authentication authentication) {
+        enforceMandorOnly(authentication);
+
+        List<UserSummaryResponseData> data = userService.getAllUsersForMandor();
         return ResponseEntity.ok(BaseResponse.success("Users retrieved successfully", data));
     }
 
@@ -100,6 +110,48 @@ public class UserController {
 
         if (!hasAdminRole) {
             throw new ForbiddenException("Only ADMIN can access this resource");
+        }
+    }
+
+    private String enforceAdminOrMandorUsersAccess(Authentication authentication, String role) {
+        if (authentication == null || authentication.getAuthorities() == null) {
+            throw new ForbiddenException();
+        }
+
+        boolean hasAdminRole = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("ROLE_ADMIN"::equals);
+
+        if (hasAdminRole) {
+            return role;
+        }
+
+        boolean hasMandorRole = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("ROLE_MANDOR"::equals);
+
+        if (!hasMandorRole) {
+            throw new ForbiddenException("Only ADMIN or MANDOR can access this resource");
+        }
+
+        if (!"SUPIR_TRUK".equalsIgnoreCase(role)) {
+            throw new ForbiddenException("MANDOR can only access users with role SUPIR_TRUK");
+        }
+
+        return "SUPIR_TRUK";
+    }
+
+    private void enforceMandorOnly(Authentication authentication) {
+        if (authentication == null || authentication.getAuthorities() == null) {
+            throw new ForbiddenException();
+        }
+
+        boolean hasMandorRole = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("ROLE_MANDOR"::equals);
+
+        if (!hasMandorRole) {
+            throw new ForbiddenException("Only MANDOR can access this resource");
         }
     }
 
