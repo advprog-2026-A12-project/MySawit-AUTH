@@ -20,11 +20,14 @@ import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
+import id.ac.ui.cs.advprog.auth.mapper.UserDetailAssembler;
+import id.ac.ui.cs.advprog.auth.mapper.UserResponseMapper;
 import id.ac.ui.cs.advprog.auth.model.BuruhMandorAssignment;
 import id.ac.ui.cs.advprog.auth.model.User;
 import id.ac.ui.cs.advprog.auth.repository.BuruhMandorAssignmentRepository;
 import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
+import id.ac.ui.cs.advprog.auth.validation.UserQueryValidator;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -71,12 +74,18 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-                userService = new UserServiceImpl(
-                                userRepository,
-                                refreshTokenRepository,
-                                buruhMandorAssignmentRepository,
-                                passwordEncoder
-                );
+        UserQueryValidator userQueryValidator = new UserQueryValidator();
+        UserResponseMapper userResponseMapper = new UserResponseMapper();
+        UserDetailAssembler userDetailAssembler = new UserDetailAssembler(buruhMandorAssignmentRepository);
+
+        userService = new UserServiceImpl(
+                userRepository,
+                refreshTokenRepository,
+                passwordEncoder,
+                userQueryValidator,
+                userResponseMapper,
+                userDetailAssembler
+        );
     }
 
     @Test
