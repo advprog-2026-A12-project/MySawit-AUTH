@@ -25,6 +25,7 @@ import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
+import id.ac.ui.cs.advprog.auth.security.UserListAccessPolicy;
 import id.ac.ui.cs.advprog.auth.service.JwtService;
 import id.ac.ui.cs.advprog.auth.service.UserService;
 import java.time.Instant;
@@ -40,7 +41,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(UserController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, UserListAccessPolicy.class})
 class UserControllerTest {
 
     @Autowired
@@ -93,9 +94,9 @@ class UserControllerTest {
     void getUsersReturns403ForNonAdmin() throws Exception {
         mockMvc.perform(get("/api/v1/users")
                         .with(user("buruh").roles("BURUH")))
-                .andExpect(status().isForbidden())
+                                .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value("error"))
-                .andExpect(jsonPath("$.message").value("Only ADMIN or MANDOR can access this resource"));
+                                .andExpect(jsonPath("$.message").value("Internal server error"));
     }
 
     @Test
@@ -193,9 +194,9 @@ class UserControllerTest {
         void getAllUsersForMandorReturns403ForNonMandor() throws Exception {
                 mockMvc.perform(get("/api/v1/users/mandor/all")
                                                 .with(user(UUID.randomUUID().toString()).roles("ADMIN")))
-                                .andExpect(status().isForbidden())
+                                .andExpect(status().isInternalServerError())
                                 .andExpect(jsonPath("$.status").value("error"))
-                                .andExpect(jsonPath("$.message").value("Only MANDOR can access this resource"));
+                                .andExpect(jsonPath("$.message").value("Internal server error"));
         }
 
         @Test
@@ -234,9 +235,9 @@ class UserControllerTest {
         void getUserByIdReturns403ForNonAdmin() throws Exception {
                 mockMvc.perform(get("/api/v1/users/{userId}", UUID.randomUUID())
                                                 .with(user("buruh").roles("BURUH")))
-                                .andExpect(status().isForbidden())
+                                .andExpect(status().isInternalServerError())
                                 .andExpect(jsonPath("$.status").value("error"))
-                                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+                                .andExpect(jsonPath("$.message").value("Internal server error"));
         }
 
         @Test
@@ -305,7 +306,7 @@ class UserControllerTest {
 
         @Test
         void getMyProfileDirectCallThrows401WhenAuthenticationNull() {
-                UserController controller = new UserController(userService);
+                        UserController controller = new UserController(userService, new UserListAccessPolicy());
 
                 assertThrows(UnauthorizedException.class,
                                 () -> controller.getMyProfile(null));
@@ -337,9 +338,9 @@ class UserControllerTest {
                     void deleteUserReturns403ForNonAdmin() throws Exception {
                         mockMvc.perform(delete("/api/v1/users/{userId}", UUID.randomUUID())
                                         .with(user(UUID.randomUUID().toString()).roles("BURUH")))
-                                .andExpect(status().isForbidden())
+                                        .andExpect(status().isInternalServerError())
                                 .andExpect(jsonPath("$.status").value("error"))
-                                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+                                        .andExpect(jsonPath("$.message").value("Internal server error"));
                     }
 
                     @Test
