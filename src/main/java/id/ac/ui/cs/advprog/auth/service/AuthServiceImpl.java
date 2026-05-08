@@ -14,6 +14,7 @@ import id.ac.ui.cs.advprog.auth.mapper.AuthResponseMapper;
 import id.ac.ui.cs.advprog.auth.model.User;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
 import id.ac.ui.cs.advprog.auth.service.utils.AuthTokenIssuer;
+import id.ac.ui.cs.advprog.auth.service.utils.GoogleUserInfo;
 import id.ac.ui.cs.advprog.auth.service.utils.IssuedTokens;
 import id.ac.ui.cs.advprog.auth.service.utils.UsernameGenerator;
 import id.ac.ui.cs.advprog.auth.validation.RegistrationValidator;

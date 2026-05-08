@@ -110,12 +110,12 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         BuruhMandorAssignment saved = assignmentRepository.save(newAssignment);
 
-        return BuruhMandorReassignmentResponseData.builder()
-            .buruh(assignmentResponseMapper.toReassignmentUserSummary(buruh))
-            .previousMandor(assignmentResponseMapper.toReassignmentUserSummary(previousMandor))
-            .newMandor(assignmentResponseMapper.toReassignmentUserSummary(newMandor))
-                .reassignedAt(saved.getAssignedAt())
-                .build();
+        return assignmentResponseMapper.toReassignmentResponse(
+            buruh,
+            previousMandor,
+            newMandor,
+            saved.getAssignedAt()
+        );
     }
 
     @Override
@@ -133,11 +133,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         activeAssignment.setUnassignedAt(unassignedAt);
         assignmentRepository.save(activeAssignment);
 
-        return BuruhMandorUnassignmentResponseData.builder()
-            .buruh(assignmentResponseMapper.toReassignmentUserSummary(buruh))
-            .previousMandor(assignmentResponseMapper.toReassignmentUserSummary(previousMandor))
-                .unassignedAt(unassignedAt)
-                .build();
+        return assignmentResponseMapper.toUnassignmentResponse(buruh, previousMandor, unassignedAt);
     }
 
 }
