@@ -13,8 +13,13 @@ import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.mapper.AuthResponseMapper;
 import id.ac.ui.cs.advprog.auth.model.User;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
+import id.ac.ui.cs.advprog.auth.service.authprovider.AuthProvider;
+import id.ac.ui.cs.advprog.auth.service.authprovider.AuthProviderFactory;
+import id.ac.ui.cs.advprog.auth.service.authprovider.AuthProviderType;
+import id.ac.ui.cs.advprog.auth.service.authprovider.AuthRequest;
+import id.ac.ui.cs.advprog.auth.service.authprovider.GoogleAuthRequest;
+import id.ac.ui.cs.advprog.auth.service.authprovider.PasswordAuthRequest;
 import id.ac.ui.cs.advprog.auth.service.utils.AuthTokenIssuer;
-import id.ac.ui.cs.advprog.auth.service.utils.GoogleUserInfo;
 import id.ac.ui.cs.advprog.auth.service.utils.IssuedTokens;
 import id.ac.ui.cs.advprog.auth.service.utils.UsernameGenerator;
 import id.ac.ui.cs.advprog.auth.validation.RegistrationValidator;
@@ -33,7 +38,7 @@ public class AuthServiceImpl implements AuthService {
     private final UsernameGenerator usernameGenerator;
     private final RefreshTokenService refreshTokenService;
     private final AuthTokenIssuer authTokenIssuer;
-    private final GoogleOAuthService googleOAuthService;
+    private final AuthProviderFactory authProviderFactory;
     private final AuthResponseMapper authResponseMapper;
 
     @Override
@@ -60,18 +65,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public LoginResponseData login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
-
-        if (!user.isActive()) {
-            throw new UnauthorizedException("Account is deactivated");
-        }
-
-        if (user.getPasswordHash() == null
-                || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new UnauthorizedException("Invalid email or password");
-        }
-
+        User user = authenticate(
+                AuthProviderType.PASSWORD,
+                new PasswordAuthRequest(request.getEmail(), request.getPassword())
+        );
         IssuedTokens tokens = authTokenIssuer.issue(user);
         return authResponseMapper.toLoginResponse(tokens);
     }
@@ -79,63 +76,17 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public LoginResponseData loginWithGoogle(GoogleLoginRequest request) {
-        GoogleUserInfo googleUserInfo = googleOAuthService.authenticate(
-            request.getAuthorizationCode(),
-            request.getRedirectUri());
-
-        User user = userRepository
-            .findByOauthProviderAndOauthProviderId("GOOGLE", googleUserInfo.providerUserId())
-            .orElseGet(() -> findOrCreateGoogleUser(googleUserInfo));
-
-        if (!user.isActive()) {
-            throw new UnauthorizedException("Account is deactivated");
-        }
-
+        User user = authenticate(
+                AuthProviderType.GOOGLE,
+                new GoogleAuthRequest(request.getAuthorizationCode(), request.getRedirectUri())
+        );
         IssuedTokens tokens = authTokenIssuer.issue(user);
         return authResponseMapper.toLoginResponse(tokens);
     }
 
-    private User findOrCreateGoogleUser(GoogleUserInfo googleUserInfo) {
-        return userRepository.findByEmail(googleUserInfo.email())
-                .map(existingUser -> linkGoogleAccount(existingUser, googleUserInfo))
-                .orElseGet(() -> createGoogleUser(googleUserInfo));
-    }
-
-    private User linkGoogleAccount(User existingUser, GoogleUserInfo googleUserInfo) {
-        if (existingUser.getOauthProvider() == null || existingUser.getOauthProvider().isBlank()) {
-            existingUser.setOauthProvider("GOOGLE");
-            existingUser.setOauthProviderId(googleUserInfo.providerUserId());
-            return userRepository.save(existingUser);
-        }
-
-        boolean sameProvider = "GOOGLE".equalsIgnoreCase(existingUser.getOauthProvider());
-        boolean sameProviderUserId = googleUserInfo.providerUserId()
-                .equals(existingUser.getOauthProviderId());
-        if (!sameProvider || !sameProviderUserId) {
-            throw new UnauthorizedException("Google account is not linked to this user");
-        }
-
-        return existingUser;
-    }
-
-    private User createGoogleUser(GoogleUserInfo googleUserInfo) {
-        String name = (googleUserInfo.name() == null || googleUserInfo.name().isBlank())
-                ? googleUserInfo.email()
-                : googleUserInfo.name();
-        String username = usernameGenerator.generateUniqueUsername(name);
-
-        User user = User.builder()
-                .username(username)
-                .email(googleUserInfo.email())
-                .name(name)
-                .passwordHash(null)
-                .role(UserRole.BURUH)
-                .oauthProvider("GOOGLE")
-                .oauthProviderId(googleUserInfo.providerUserId())
-                .isActive(true)
-                .build();
-
-        return userRepository.save(user);
+    private User authenticate(AuthProviderType type, AuthRequest request) {
+        AuthProvider provider = authProviderFactory.create(type);
+        return provider.authenticate(request);
     }
 
     @Override
