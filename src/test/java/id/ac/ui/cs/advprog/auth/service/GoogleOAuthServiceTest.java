@@ -10,6 +10,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
+import id.ac.ui.cs.advprog.auth.service.utils.GoogleUserInfo;
+
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

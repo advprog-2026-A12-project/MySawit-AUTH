@@ -23,12 +23,22 @@ import id.ac.ui.cs.advprog.auth.exception.InvalidTokenException;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
+import id.ac.ui.cs.advprog.auth.mapper.AuthResponseMapper;
 import id.ac.ui.cs.advprog.auth.model.RefreshToken;
 import id.ac.ui.cs.advprog.auth.model.User;
 import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
+import id.ac.ui.cs.advprog.auth.service.utils.AuthTokenIssuer;
+import id.ac.ui.cs.advprog.auth.service.utils.GoogleUserInfo;
+import id.ac.ui.cs.advprog.auth.service.utils.UsernameGenerator;
+import id.ac.ui.cs.advprog.auth.service.authprovider.AuthProviderFactory;
+import id.ac.ui.cs.advprog.auth.service.authprovider.DefaultAuthProviderFactory;
+import id.ac.ui.cs.advprog.auth.service.authprovider.GoogleAuthProvider;
+import id.ac.ui.cs.advprog.auth.service.authprovider.PasswordAuthProvider;
+import id.ac.ui.cs.advprog.auth.validation.RegistrationValidator;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +46,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -46,16 +55,40 @@ class AuthServiceImplTest {
 
     @Mock private UserRepository userRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
-    @Mock private JwtService jwtService;
+        @Mock private JwtService jwtService;
         @Mock private GoogleOAuthService googleOAuthService;
     @Mock private PasswordEncoder passwordEncoder;
 
-    @InjectMocks private AuthServiceImpl authService;
+        private AuthServiceImpl authService;
 
     private User sampleUser;
 
     @BeforeEach
     void setUp() {
+        RegistrationValidator registrationValidator = new RegistrationValidator(userRepository);
+        UsernameGenerator usernameGenerator = new UsernameGenerator(userRepository);
+        RefreshTokenService refreshTokenService = new RefreshTokenService(refreshTokenRepository, jwtService);
+        AuthTokenIssuer authTokenIssuer = new AuthTokenIssuer(jwtService, refreshTokenService);
+        AuthResponseMapper authResponseMapper = new AuthResponseMapper();
+
+        AuthProviderFactory authProviderFactory = new DefaultAuthProviderFactory(
+                List.of(
+                        new PasswordAuthProvider(userRepository, passwordEncoder),
+                        new GoogleAuthProvider(userRepository, googleOAuthService, usernameGenerator)
+                )
+        );
+
+        authService = new AuthServiceImpl(
+                userRepository,
+                passwordEncoder,
+                registrationValidator,
+                usernameGenerator,
+                refreshTokenService,
+                authTokenIssuer,
+                authProviderFactory,
+                authResponseMapper
+        );
+
         sampleUser = User.builder()
                 .id(UUID.randomUUID())
                 .username("ahmad-buruh-a1b2")
