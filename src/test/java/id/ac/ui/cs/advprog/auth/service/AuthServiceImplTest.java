@@ -35,6 +35,7 @@ import id.ac.ui.cs.advprog.auth.service.authprovider.AuthProviderFactory;
 import id.ac.ui.cs.advprog.auth.service.authprovider.DefaultAuthProviderFactory;
 import id.ac.ui.cs.advprog.auth.service.authprovider.GoogleAuthProvider;
 import id.ac.ui.cs.advprog.auth.service.authprovider.PasswordAuthProvider;
+import id.ac.ui.cs.advprog.auth.service.oauth.OAuthClient;
 import id.ac.ui.cs.advprog.auth.validation.RegistrationValidator;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -56,7 +57,7 @@ class AuthServiceImplTest {
     @Mock private UserRepository userRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
         @Mock private JwtService jwtService;
-        @Mock private GoogleOAuthService googleOAuthService;
+        @Mock private OAuthClient oauthClient;
     @Mock private PasswordEncoder passwordEncoder;
 
         private AuthServiceImpl authService;
@@ -74,7 +75,7 @@ class AuthServiceImplTest {
         AuthProviderFactory authProviderFactory = new DefaultAuthProviderFactory(
                 List.of(
                         new PasswordAuthProvider(userRepository, passwordEncoder),
-                        new GoogleAuthProvider(userRepository, googleOAuthService, usernameGenerator)
+                        new GoogleAuthProvider(userRepository, oauthClient, usernameGenerator)
                 )
         );
 
@@ -392,7 +393,7 @@ class AuthServiceImplTest {
                     "Google User"
             );
 
-            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+            when(oauthClient.authenticate("google-auth-code", "postmessage"))
                     .thenReturn(googleUserInfo);
             when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-123"))
                     .thenReturn(Optional.empty());
@@ -430,7 +431,7 @@ class AuthServiceImplTest {
             sampleUser.setOauthProvider(null);
             sampleUser.setOauthProviderId(null);
 
-            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+            when(oauthClient.authenticate("google-auth-code", "postmessage"))
                     .thenReturn(googleUserInfo);
             when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-999"))
                     .thenReturn(Optional.empty());
@@ -462,7 +463,7 @@ class AuthServiceImplTest {
             sampleUser.setOauthProvider("GOOGLE");
             sampleUser.setOauthProviderId("google-sub-existing");
 
-            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+            when(oauthClient.authenticate("google-auth-code", "postmessage"))
                     .thenReturn(new GoogleUserInfo("google-sub-existing", "ahmad@example.com", "Ahmad"));
             when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-existing"))
                     .thenReturn(Optional.of(sampleUser));
@@ -489,7 +490,7 @@ class AuthServiceImplTest {
             sampleUser.setOauthProvider("GITHUB");
             sampleUser.setOauthProviderId("github-sub");
 
-            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+            when(oauthClient.authenticate("google-auth-code", "postmessage"))
                     .thenReturn(new GoogleUserInfo("google-sub-1", "ahmad@example.com", "Ahmad"));
             when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-1"))
                     .thenReturn(Optional.empty());
@@ -510,7 +511,7 @@ class AuthServiceImplTest {
             sampleUser.setOauthProviderId("google-sub-inactive");
             sampleUser.setActive(false);
 
-            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+            when(oauthClient.authenticate("google-auth-code", "postmessage"))
                     .thenReturn(new GoogleUserInfo("google-sub-inactive", "ahmad@example.com", "Ahmad"));
             when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-inactive"))
                     .thenReturn(Optional.of(sampleUser));
@@ -526,7 +527,7 @@ class AuthServiceImplTest {
                     .redirectUri("postmessage")
                     .build();
 
-            when(googleOAuthService.authenticate("google-auth-code", "postmessage"))
+            when(oauthClient.authenticate("google-auth-code", "postmessage"))
                     .thenReturn(new GoogleUserInfo("google-sub-blank", "blank@example.com", " "));
             when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-blank"))
                     .thenReturn(Optional.empty());
