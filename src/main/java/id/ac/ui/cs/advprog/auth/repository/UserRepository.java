@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificationExecutor<User> {
     Optional<User> findByEmail(String email);
+    Optional<User> findByOauthProviderAndOauthProviderId(String oauthProvider, String oauthProviderId);
     boolean existsByEmail(String email);
     boolean existsByUsername(String username);
     boolean existsByMandorCertificationNumber(String mandorCertificationNumber);

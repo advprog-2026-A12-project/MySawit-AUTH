@@ -5,6 +5,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,6 +22,7 @@ import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponse
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
+import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.service.JwtService;
@@ -32,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -144,6 +148,17 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.status").value("error"))
                 .andExpect(jsonPath("$.message").value("MANDOR can only access users with role SUPIR_TRUK"));
     }
+
+        @Test
+        void getUsersReturns403WhenAuthoritiesNull() throws Exception {
+                Authentication auth = org.mockito.Mockito.mock(Authentication.class);
+                when(auth.getAuthorities()).thenReturn(null);
+
+                mockMvc.perform(get("/api/v1/users").with(authentication(auth)))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("Access denied"));
+        }
 
     @Test
     void getUsersReturns401WithoutAuth() throws Exception {
@@ -274,6 +289,26 @@ class UserControllerTest {
                                 .andExpect(status().isUnauthorized())
                                 .andExpect(jsonPath("$.status").value("error"))
                                 .andExpect(jsonPath("$.message").value("Unauthorized"));
+        }
+
+        @Test
+        void getMyProfileReturns401WhenAuthenticatedNameNull() throws Exception {
+                Authentication auth = org.mockito.Mockito.mock(Authentication.class);
+                when(auth.isAuthenticated()).thenReturn(true);
+                when(auth.getName()).thenReturn(null);
+
+                mockMvc.perform(get("/api/v1/users/me").with(authentication(auth)))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.status").value("error"))
+                                .andExpect(jsonPath("$.message").value("Unauthorized"));
+        }
+
+        @Test
+        void getMyProfileDirectCallThrows401WhenAuthenticationNull() {
+                UserController controller = new UserController(userService);
+
+                assertThrows(UnauthorizedException.class,
+                                () -> controller.getMyProfile(null));
         }
 
                     @Test
