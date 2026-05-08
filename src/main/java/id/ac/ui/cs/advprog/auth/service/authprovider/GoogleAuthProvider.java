@@ -5,7 +5,7 @@ import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.model.User;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
-import id.ac.ui.cs.advprog.auth.service.GoogleOAuthService;
+import id.ac.ui.cs.advprog.auth.service.oauth.OAuthClient;
 import id.ac.ui.cs.advprog.auth.service.utils.GoogleUserInfo;
 import id.ac.ui.cs.advprog.auth.service.utils.UsernameGenerator;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ public class GoogleAuthProvider implements AuthProvider {
     private static final String GOOGLE = "GOOGLE";
 
     private final UserRepository userRepository;
-    private final GoogleOAuthService googleOAuthService;
+    private final OAuthClient oauthClient;
     private final UsernameGenerator usernameGenerator;
 
     @Override
@@ -32,7 +32,7 @@ public class GoogleAuthProvider implements AuthProvider {
             throw new UnprocessableEntityException("Invalid auth request");
         }
 
-        GoogleUserInfo googleUserInfo = googleOAuthService.authenticate(
+        GoogleUserInfo googleUserInfo = oauthClient.authenticate(
                 googleRequest.authorizationCode(),
                 googleRequest.redirectUri());
 
