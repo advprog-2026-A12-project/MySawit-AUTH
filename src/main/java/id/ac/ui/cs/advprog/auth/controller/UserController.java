@@ -71,7 +71,7 @@ public class UserController {
 
     @GetMapping("/me")
     public ResponseEntity<BaseResponse<UserDetailResponseData>> getMyProfile(Authentication authentication) {
-        UUID userId = extractAuthenticatedUserId(authentication);
+        UUID userId = userListAccessPolicy.extractAuthenticatedUserId(authentication);
         UserDetailResponseData data = userService.getUserById(userId);
         return ResponseEntity.ok(BaseResponse.success("Profile retrieved successfully", data));
     }
@@ -82,7 +82,7 @@ public class UserController {
             @PathVariable UUID userId,
             Authentication authentication
     ) {
-        UUID authenticatedAdminId = extractAuthenticatedUserId(authentication);
+        UUID authenticatedAdminId = userListAccessPolicy.extractAuthenticatedUserId(authentication);
         DeletedUserResponseData data = userService.deleteUser(userId, authenticatedAdminId);
         return ResponseEntity.ok(BaseResponse.success("User deleted successfully", data));
     }
@@ -92,20 +92,10 @@ public class UserController {
             @Valid @RequestBody UpdateMyProfileRequest request,
             Authentication authentication
     ) {
-        UUID userId = extractAuthenticatedUserId(authentication);
+        UUID userId = userListAccessPolicy.extractAuthenticatedUserId(authentication);
         UpdatedMyProfileResponseData data = userService.updateMyProfile(userId, request);
         return ResponseEntity.ok(BaseResponse.success("Profile updated successfully", data));
     }
 
-    private UUID extractAuthenticatedUserId(Authentication authentication) {
-        if (authentication == null || authentication.getName() == null) {
-            throw new UnauthorizedException("Unauthorized");
-        }
-
-        try {
-            return UUID.fromString(authentication.getName());
-        } catch (IllegalArgumentException ex) {
-            throw new UnauthorizedException("Unauthorized");
-        }
-    }
+    
 }
