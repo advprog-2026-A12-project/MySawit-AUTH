@@ -2,22 +2,21 @@ package id.ac.ui.cs.advprog.auth.service;
 
 import id.ac.ui.cs.advprog.auth.dto.request.management.AssignBuruhMandorRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.management.ReassignBuruhMandorRequest;
-import id.ac.ui.cs.advprog.auth.dto.response.management.AssignmentUserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorUnassignmentResponseData;
-import id.ac.ui.cs.advprog.auth.dto.response.management.ReassignmentUserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.AssignmentConflictException;
-import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
+import id.ac.ui.cs.advprog.auth.mapper.AssignmentResponseMapper;
 import id.ac.ui.cs.advprog.auth.model.BuruhMandorAssignment;
 import id.ac.ui.cs.advprog.auth.model.User;
 import java.time.Instant;
 import id.ac.ui.cs.advprog.auth.repository.BuruhMandorAssignmentRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
+import id.ac.ui.cs.advprog.auth.validation.AssignmentQueryValidator;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,11 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AssignmentServiceImpl implements AssignmentService {
 
-    private static final int MIN_SIZE = 1;
-    private static final int MAX_SIZE = 100;
-
     private final BuruhMandorAssignmentRepository assignmentRepository;
     private final UserRepository userRepository;
+    private final AssignmentQueryValidator assignmentQueryValidator;
+    private final AssignmentResponseMapper assignmentResponseMapper;
 
     @Override
     @Transactional(readOnly = true)
@@ -51,25 +49,17 @@ public class AssignmentServiceImpl implements AssignmentService {
         String buruhName,
         String mandorName
     ) {
-    validatePageParams(page, size);
+    assignmentQueryValidator.validatePageParams(page, size);
 
     Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "assignedAt"));
     Specification<BuruhMandorAssignment> specification = buildSpecification(mandorId, buruhName, mandorName);
     Page<BuruhMandorAssignment> assignmentsPage = assignmentRepository.findAll(specification, pageable);
 
     List<BuruhMandorAssignmentResponseData> content = assignmentsPage.getContent().stream()
-        .map(this::toAssignmentResponse)
+        .map(assignmentResponseMapper::toAssignmentResponse)
         .toList();
 
-    return BuruhMandorAssignmentPageResponseData.builder()
-        .content(content)
-        .page(assignmentsPage.getNumber())
-        .size(assignmentsPage.getSize())
-        .totalElements(assignmentsPage.getTotalElements())
-        .totalPages(assignmentsPage.getTotalPages())
-        .first(assignmentsPage.isFirst())
-        .last(assignmentsPage.isLast())
-        .build();
+    return assignmentResponseMapper.toPageResponse(assignmentsPage, content);
     }
 
     @Override
@@ -96,12 +86,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .build();
 
         BuruhMandorAssignment saved = assignmentRepository.save(assignment);
-        return BuruhMandorAssignmentResponseData.builder()
-                .id(saved.getId())
-                .buruh(toAssignmentUserSummary(buruh))
-                .mandor(toAssignmentUserSummary(mandor))
-                .assignedAt(saved.getAssignedAt())
-                .build();
+        return assignmentResponseMapper.toAssignmentResponse(saved);
     }
 
     @Override
@@ -139,9 +124,9 @@ public class AssignmentServiceImpl implements AssignmentService {
         BuruhMandorAssignment saved = assignmentRepository.save(newAssignment);
 
         return BuruhMandorReassignmentResponseData.builder()
-                .buruh(toReassignmentUserSummary(buruh))
-                .previousMandor(toReassignmentUserSummary(previousMandor))
-                .newMandor(toReassignmentUserSummary(newMandor))
+            .buruh(assignmentResponseMapper.toReassignmentUserSummary(buruh))
+            .previousMandor(assignmentResponseMapper.toReassignmentUserSummary(previousMandor))
+            .newMandor(assignmentResponseMapper.toReassignmentUserSummary(newMandor))
                 .reassignedAt(saved.getAssignedAt())
                 .build();
     }
@@ -165,8 +150,8 @@ public class AssignmentServiceImpl implements AssignmentService {
         assignmentRepository.save(activeAssignment);
 
         return BuruhMandorUnassignmentResponseData.builder()
-                .buruh(toReassignmentUserSummary(buruh))
-                .previousMandor(toReassignmentUserSummary(previousMandor))
+            .buruh(assignmentResponseMapper.toReassignmentUserSummary(buruh))
+            .previousMandor(assignmentResponseMapper.toReassignmentUserSummary(previousMandor))
                 .unassignedAt(unassignedAt)
                 .build();
     }
@@ -178,23 +163,6 @@ public class AssignmentServiceImpl implements AssignmentService {
             throw new UserNotFoundException(notFoundMessage);
         }
         return user;
-    }
-
-    private AssignmentUserSummaryResponseData toAssignmentUserSummary(User user) {
-        return AssignmentUserSummaryResponseData.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .build();
-    }
-
-    private BuruhMandorAssignmentResponseData toAssignmentResponse(BuruhMandorAssignment assignment) {
-        return BuruhMandorAssignmentResponseData.builder()
-                .id(assignment.getId())
-                .buruh(toAssignmentUserSummary(assignment.getBuruh()))
-                .mandor(toAssignmentUserSummary(assignment.getMandor()))
-                .assignedAt(assignment.getAssignedAt())
-                .build();
     }
 
     private Specification<BuruhMandorAssignment> buildSpecification(UUID mandorId, String buruhName, String mandorName) {
@@ -223,21 +191,5 @@ public class AssignmentServiceImpl implements AssignmentService {
 
             return cb.and(predicates.toArray(Predicate[]::new));
         };
-    }
-
-    private void validatePageParams(int page, int size) {
-        if (page < 0) {
-            throw new InvalidUserRequestException("page must be greater than or equal to 0");
-        }
-        if (size < MIN_SIZE || size > MAX_SIZE) {
-            throw new InvalidUserRequestException("size must be between 1 and 100");
-        }
-    }
-
-    private ReassignmentUserSummaryResponseData toReassignmentUserSummary(User user) {
-        return ReassignmentUserSummaryResponseData.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .build();
     }
 }
