@@ -5,15 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import id.ac.ui.cs.advprog.auth.dto.request.auth.LoginRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.auth.LogoutRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.auth.RefreshTokenRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RegisterRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.BaseResponse;
 import id.ac.ui.cs.advprog.auth.dto.response.FieldErrorDto;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginUserDto;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.RegisterResponseData;
-import id.ac.ui.cs.advprog.auth.dto.response.auth.TokenRefreshResponseData;
 import id.ac.ui.cs.advprog.auth.exception.ApiErrorResponse;
 import java.time.Instant;
 import java.util.List;
@@ -51,24 +48,6 @@ class DtoRecordTest {
     }
 
     @Test
-    void logoutRequestWorks() {
-        LogoutRequest request = LogoutRequest.builder()
-                .refreshToken("some-refresh-token")
-                .build();
-
-        assertEquals("some-refresh-token", request.getRefreshToken());
-    }
-
-    @Test
-    void refreshTokenRequestWorks() {
-        RefreshTokenRequest request = RefreshTokenRequest.builder()
-                .refreshToken("some-refresh-token")
-                .build();
-
-        assertEquals("some-refresh-token", request.getRefreshToken());
-    }
-
-    @Test
     void registerResponseDataWorks() {
         UUID id = UUID.randomUUID();
         Instant now = Instant.now();
@@ -100,30 +79,13 @@ class DtoRecordTest {
 
         LoginResponseData data = LoginResponseData.builder()
                 .accessToken("access-token")
-                .refreshToken("refresh-token")
                 .tokenType("Bearer")
-                .expiresIn(900)
+            .expiresIn(21600)
                 .build();
 
         assertEquals("access-token", data.getAccessToken());
-        assertEquals("refresh-token", data.getRefreshToken());
         assertEquals("Bearer", data.getTokenType());
-        assertEquals(900, data.getExpiresIn());
-    }
-
-    @Test
-    void tokenRefreshResponseDataWorks() {
-        TokenRefreshResponseData data = TokenRefreshResponseData.builder()
-                .accessToken("new-access-token")
-                .refreshToken("new-refresh-token")
-                .tokenType("Bearer")
-                .expiresIn(900)
-                .build();
-
-        assertEquals("new-access-token", data.getAccessToken());
-        assertEquals("new-refresh-token", data.getRefreshToken());
-        assertEquals("Bearer", data.getTokenType());
-        assertEquals(900, data.getExpiresIn());
+        assertEquals(21600, data.getExpiresIn());
     }
 
     @Test

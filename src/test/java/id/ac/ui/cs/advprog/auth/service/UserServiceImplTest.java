@@ -25,7 +25,6 @@ import id.ac.ui.cs.advprog.auth.mapper.UserResponseMapper;
 import id.ac.ui.cs.advprog.auth.model.BuruhMandorAssignment;
 import id.ac.ui.cs.advprog.auth.model.User;
 import id.ac.ui.cs.advprog.auth.repository.BuruhMandorAssignmentRepository;
-import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
 import id.ac.ui.cs.advprog.auth.validation.UserQueryValidator;
 import java.time.Instant;
@@ -61,8 +60,6 @@ class UserServiceImplTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
-        @Mock
-        private RefreshTokenRepository refreshTokenRepository;
 
         @Mock
         private BuruhMandorAssignmentRepository buruhMandorAssignmentRepository;
@@ -80,7 +77,6 @@ class UserServiceImplTest {
 
         userService = new UserServiceImpl(
                 userRepository,
-                refreshTokenRepository,
                 passwordEncoder,
                 userQueryValidator,
                 userResponseMapper,
@@ -703,7 +699,7 @@ class UserServiceImplTest {
         }
 
     @Test
-    void deleteUserSoftDeletesAndRemovesTokens() {
+    void deleteUserSoftDeletes() {
         UUID targetUserId = UUID.randomUUID();
         UUID adminId = UUID.randomUUID();
         User user = User.builder()
@@ -721,7 +717,6 @@ class UserServiceImplTest {
         assertEquals(targetUserId, response.getId());
         assertEquals("ahmad@example.com", response.getEmail());
         assertEquals("Ahmad Buruh", response.getName());
-        verify(refreshTokenRepository).deleteAllByUser(user);
     }
 
     @Test

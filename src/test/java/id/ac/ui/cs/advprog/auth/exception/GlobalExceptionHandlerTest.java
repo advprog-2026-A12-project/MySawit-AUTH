@@ -99,15 +99,7 @@ class GlobalExceptionHandlerTest {
         assertEquals("Too many requests, please try again later", response.getBody().message());
     }
 
-    @Test
-    void handleInvalidToken() {
-        ResponseEntity<ErrorResponse> response =
-                handler.handleBaseException(new InvalidTokenException());
 
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("Token is invalid or expired", response.getBody().message());
-    }
 
     @Test
     void handleGenericException() {

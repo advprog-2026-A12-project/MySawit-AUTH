@@ -2,7 +2,6 @@ package id.ac.ui.cs.advprog.auth.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -24,7 +23,7 @@ class JwtServiceTest {
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService(TEST_SECRET, 900, 604800);
+        jwtService = new JwtService(TEST_SECRET, 21600);
     }
 
     private User sampleUser() {
@@ -106,7 +105,7 @@ class JwtServiceTest {
     @Test
     void isTokenValidReturnsFalseForExpiredToken() {
         // Create a service with 0-second expiration
-        JwtService shortLived = new JwtService(TEST_SECRET, 0, 0);
+        JwtService shortLived = new JwtService(TEST_SECRET, 0);
         String token = shortLived.generateAccessToken(sampleUser());
 
         // Token is already expired
@@ -114,45 +113,8 @@ class JwtServiceTest {
     }
 
     @Test
-    void generateRefreshTokenReturnsNonBlankString() {
-        String refreshToken = jwtService.generateRefreshToken();
-        assertNotNull(refreshToken);
-        assertFalse(refreshToken.isBlank());
-    }
-
-    @Test
-    void generateRefreshTokenIsUnique() {
-        String token1 = jwtService.generateRefreshToken();
-        String token2 = jwtService.generateRefreshToken();
-        assertNotEquals(token1, token2);
-    }
-
-    @Test
-    void hashTokenReturnsDeterministicHash() {
-        String token = "test-token-value";
-        String hash1 = jwtService.hashToken(token);
-        String hash2 = jwtService.hashToken(token);
-
-        assertNotNull(hash1);
-        assertEquals(64, hash1.length()); // SHA-256 = 64 hex chars
-        assertEquals(hash1, hash2);
-    }
-
-    @Test
-    void hashTokenReturnsDifferentHashForDifferentInput() {
-        String hash1 = jwtService.hashToken("token-a");
-        String hash2 = jwtService.hashToken("token-b");
-        assertNotEquals(hash1, hash2);
-    }
-
-    @Test
     void getAccessTokenExpirationReturnsConfiguredValue() {
-        assertEquals(900, jwtService.getAccessTokenExpiration());
-    }
-
-    @Test
-    void getRefreshTokenExpirationReturnsConfiguredValue() {
-        assertEquals(604800, jwtService.getRefreshTokenExpiration());
+        assertEquals(21600, jwtService.getAccessTokenExpiration());
     }
 
     @Test
@@ -165,7 +127,7 @@ class JwtServiceTest {
         // Generate with a different key
         String otherSecret =
                 "YW5vdGhlclNlY3JldEtleVRoYXRJc0RpZmZlcmVudEZyb21UaGVPcmlnaW5hbFNlY3JldEtleUhlcmU=";
-        JwtService otherService = new JwtService(otherSecret, 900, 604800);
+        JwtService otherService = new JwtService(otherSecret, 21600);
         String token = otherService.generateAccessToken(sampleUser());
 
         assertFalse(jwtService.isTokenValid(token));

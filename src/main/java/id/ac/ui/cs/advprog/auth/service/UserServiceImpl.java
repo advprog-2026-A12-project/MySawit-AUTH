@@ -13,7 +13,6 @@ import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
 import id.ac.ui.cs.advprog.auth.mapper.UserDetailAssembler;
 import id.ac.ui.cs.advprog.auth.mapper.UserResponseMapper;
 import id.ac.ui.cs.advprog.auth.model.User;
-import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
 import id.ac.ui.cs.advprog.auth.validation.UserQueryValidator;
 import java.time.Instant;
@@ -36,7 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserQueryValidator userQueryValidator;
     private final UserResponseMapper userResponseMapper;
@@ -109,7 +107,6 @@ public class UserServiceImpl implements UserService {
         user.setUpdatedAt(deletedAt);
 
         User saved = userRepository.save(user);
-        refreshTokenRepository.deleteAllByUser(saved);
 
         return userResponseMapper.toDeletedUserResponse(saved, deletedAt);
     }
