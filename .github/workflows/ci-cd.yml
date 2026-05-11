@@ -43,6 +43,25 @@ permissions:
 jobs:
   Analysis:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_DB: authdb_test
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_PORT: 6001
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: authdb_test
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        ports:
+          - 6001:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
