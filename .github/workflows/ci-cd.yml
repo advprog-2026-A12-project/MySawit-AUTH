@@ -92,7 +92,7 @@ jobs:
   deploy:
     needs: Analysis
     runs-on: ubuntu-latest
-    if: needs.Analysis.result == 'success' && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && needs.Analysis.result == 'success' && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
     steps:
       - name: Deploy to Staging
         if: github.ref == 'refs/heads/staging'
