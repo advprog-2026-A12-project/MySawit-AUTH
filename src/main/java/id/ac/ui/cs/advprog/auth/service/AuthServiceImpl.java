@@ -1,26 +1,24 @@
 package id.ac.ui.cs.advprog.auth.service;
 
 import id.ac.ui.cs.advprog.auth.dto.request.auth.LoginRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.auth.LogoutRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.auth.RefreshTokenRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RegisterRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.GoogleLoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.RegisterResponseData;
-import id.ac.ui.cs.advprog.auth.dto.response.auth.TokenRefreshResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
-import id.ac.ui.cs.advprog.auth.exception.DuplicateUserException;
-import id.ac.ui.cs.advprog.auth.exception.InvalidTokenException;
-import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
-import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
-import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
-import id.ac.ui.cs.advprog.auth.model.RefreshToken;
+import id.ac.ui.cs.advprog.auth.mapper.AuthResponseMapper;
 import id.ac.ui.cs.advprog.auth.model.User;
-import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
-import java.security.SecureRandom;
-import java.time.Instant;
-import java.util.HexFormat;
+import id.ac.ui.cs.advprog.auth.service.authprovider.AuthProvider;
+import id.ac.ui.cs.advprog.auth.service.authprovider.AuthProviderFactory;
+import id.ac.ui.cs.advprog.auth.service.authprovider.AuthProviderType;
+import id.ac.ui.cs.advprog.auth.service.authprovider.AuthRequest;
+import id.ac.ui.cs.advprog.auth.service.authprovider.GoogleAuthRequest;
+import id.ac.ui.cs.advprog.auth.service.authprovider.PasswordAuthRequest;
+import id.ac.ui.cs.advprog.auth.service.utils.AuthTokenIssuer;
+import id.ac.ui.cs.advprog.auth.service.utils.IssuedTokens;
+import id.ac.ui.cs.advprog.auth.service.utils.UsernameGenerator;
+import id.ac.ui.cs.advprog.auth.validation.RegistrationValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -31,29 +29,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
-    private final JwtService jwtService;
-    private final GoogleOAuthService googleOAuthService;
     private final PasswordEncoder passwordEncoder;
-
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final RegistrationValidator registrationValidator;
+    private final UsernameGenerator usernameGenerator;
+    private final AuthTokenIssuer authTokenIssuer;
+    private final AuthProviderFactory authProviderFactory;
+    private final AuthResponseMapper authResponseMapper;
 
     @Override
     @Transactional
     public RegisterResponseData register(RegisterRequest request) {
-        UserRole role = parseAndValidateRole(request.getRole());
-
-        validateMandorCertification(role, request.getMandorCertificationNumber());
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateUserException("Email");
-        }
-
-        if (request.getMandorCertificationNumber() != null && !request.getMandorCertificationNumber().isBlank() && userRepository.existsByMandorCertificationNumber( request.getMandorCertificationNumber())) {
-            throw new DuplicateUserException("Mandor certification number");
-        }
-
-        String username = generateUniqueUsername(request.getName()); // Haursnya bisa dihapus
+        UserRole role = registrationValidator.validate(request);
+        String username = usernameGenerator.generateUniqueUsername(request.getName());
 
         User user = User.builder()
                 .username(username)
@@ -67,207 +54,43 @@ public class AuthServiceImpl implements AuthService {
 
         User saved = userRepository.save(user);
 
-        return RegisterResponseData.builder()
-                .id(saved.getId())
-                .username(saved.getUsername())
-                .email(saved.getEmail())
-                .name(saved.getName())
-                .role(saved.getRole().name())
-                .createdAt(saved.getCreatedAt())
-                .build();
+        return authResponseMapper.toRegisterResponse(saved);
     }
 
     @Override
     @Transactional
     public LoginResponseData login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
-
-        if (!user.isActive()) {
-            throw new UnauthorizedException("Account is deactivated");
-        }
-
-        if (user.getPasswordHash() == null
-                || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new UnauthorizedException("Invalid email or password");
-        }
-
-        return issueLoginTokens(user);
+        User user = authenticate(
+                AuthProviderType.PASSWORD,
+                new PasswordAuthRequest(request.getEmail(), request.getPassword())
+        );
+        IssuedTokens tokens = authTokenIssuer.issue(user);
+        return authResponseMapper.toLoginResponse(tokens);
     }
 
     @Override
     @Transactional
     public LoginResponseData loginWithGoogle(GoogleLoginRequest request) {
-        GoogleUserInfo googleUserInfo = googleOAuthService.authenticate(
-                request.getAuthorizationCode(),
-                request.getRedirectUri());
-
-        User user = userRepository
-                .findByOauthProviderAndOauthProviderId("GOOGLE", googleUserInfo.providerUserId())
-                .orElseGet(() -> findOrCreateGoogleUser(googleUserInfo));
-
-        if (!user.isActive()) {
-            throw new UnauthorizedException("Account is deactivated");
-        }
-
-        return issueLoginTokens(user);
+        User user = authenticate(
+                AuthProviderType.GOOGLE,
+                new GoogleAuthRequest(request.getAuthorizationCode(), request.getRedirectUri())
+        );
+        IssuedTokens tokens = authTokenIssuer.issue(user);
+        return authResponseMapper.toLoginResponse(tokens);
     }
 
-    private User findOrCreateGoogleUser(GoogleUserInfo googleUserInfo) {
-        return userRepository.findByEmail(googleUserInfo.email())
-                .map(existingUser -> linkGoogleAccount(existingUser, googleUserInfo))
-                .orElseGet(() -> createGoogleUser(googleUserInfo));
-    }
-
-    private User linkGoogleAccount(User existingUser, GoogleUserInfo googleUserInfo) {
-        if (existingUser.getOauthProvider() == null || existingUser.getOauthProvider().isBlank()) {
-            existingUser.setOauthProvider("GOOGLE");
-            existingUser.setOauthProviderId(googleUserInfo.providerUserId());
-            return userRepository.save(existingUser);
-        }
-
-        boolean sameProvider = "GOOGLE".equalsIgnoreCase(existingUser.getOauthProvider());
-        boolean sameProviderUserId = googleUserInfo.providerUserId()
-                .equals(existingUser.getOauthProviderId());
-        if (!sameProvider || !sameProviderUserId) {
-            throw new UnauthorizedException("Google account is not linked to this user");
-        }
-
-        return existingUser;
-    }
-
-    private User createGoogleUser(GoogleUserInfo googleUserInfo) {
-        String name = (googleUserInfo.name() == null || googleUserInfo.name().isBlank())
-                ? googleUserInfo.email()
-                : googleUserInfo.name();
-        String username = generateUniqueUsername(name);
-
-        User user = User.builder()
-                .username(username)
-                .email(googleUserInfo.email())
-                .name(name)
-                .passwordHash(null)
-                .role(UserRole.BURUH)
-                .oauthProvider("GOOGLE")
-                .oauthProviderId(googleUserInfo.providerUserId())
-                .isActive(true)
-                .build();
-
-        return userRepository.save(user);
-    }
-
-    private LoginResponseData issueLoginTokens(User user) {
-        String accessToken = jwtService.generateAccessToken(user);
-        String rawRefreshToken = jwtService.generateRefreshToken();
-
-        persistRefreshToken(user, rawRefreshToken);
-
-        return LoginResponseData.builder()
-                .accessToken(accessToken)
-                .refreshToken(rawRefreshToken)
-                .tokenType("Bearer")
-                .expiresIn((int) jwtService.getAccessTokenExpiration())
-                .build();
+    private User authenticate(AuthProviderType type, AuthRequest request) {
+        AuthProvider provider = authProviderFactory.create(type);
+        return provider.authenticate(request);
     }
 
     @Override
     @Transactional
-    public void logout(LogoutRequest request) {
-        String tokenHash = jwtService.hashToken(request.getRefreshToken());
-        refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(rt -> {
-            if (!rt.isRevoked()) {
-                rt.setRevoked(true);
-                refreshTokenRepository.save(rt);
-            }
-        });
-    }
-
-    @Override
-    @Transactional
-    public TokenRefreshResponseData refresh(RefreshTokenRequest request) {
-        String tokenHash = jwtService.hashToken(request.getRefreshToken());
-
-        RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> new InvalidTokenException("Refresh token not found"));
-
-        if (storedToken.isRevoked()) {
-            refreshTokenRepository.revokeAllByUser(storedToken.getUser());
-            throw new InvalidTokenException("Refresh token has been revoked");
-        }
-
-        if (storedToken.isExpired()) {
-            throw new InvalidTokenException("Refresh token has expired");
-        }
-        storedToken.setRevoked(true);
-        refreshTokenRepository.save(storedToken);
-
-        User user = storedToken.getUser();
-        if (!user.isActive()) {
-            throw new UnauthorizedException("Account is deactivated");
-        }
-
-        String newAccessToken = jwtService.generateAccessToken(user);
-        String newRawRefreshToken = jwtService.generateRefreshToken();
-
-        persistRefreshToken(user, newRawRefreshToken);
-
-        return TokenRefreshResponseData.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(newRawRefreshToken)
-                .tokenType("Bearer")
-                .expiresIn((int) jwtService.getAccessTokenExpiration())
-                .build();
-    }
-
-    private UserRole parseAndValidateRole(String roleStr) {
-        UserRole role;
-        try {
-            role = UserRole.valueOf(roleStr.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new InvalidUserRequestException("Invalid role: " + roleStr);
-        }
-        if (role == UserRole.ADMIN) {
-            throw new UnprocessableEntityException("ADMIN role is not allowed for registration");
-        }
-        return role;
-    }
-
-    private void validateMandorCertification(UserRole role, String certNumber) {
-        if (role == UserRole.MANDOR && (certNumber == null || certNumber.isBlank())) {
-            throw new UnprocessableEntityException(
-                    "mandorCertificationNumber is required for MANDOR role");
-        }
-    }
-
-    private void persistRefreshToken(User user, String rawRefreshToken) {
-        String hash = jwtService.hashToken(rawRefreshToken);
-        RefreshToken refreshToken = RefreshToken.builder()
-                .user(user)
-                .tokenHash(hash)
-                .expiresAt(Instant.now().plusSeconds(jwtService.getRefreshTokenExpiration()))
-                .build();
-        refreshTokenRepository.save(refreshToken);
+    public void logout() {
+        // Stateless JWT: nothing to revoke server-side.
     }
 
     String generateUniqueUsername(String name) {
-        String slug = name.toLowerCase()
-                .replaceAll("[^a-z0-9\\s-]", "")
-                .replaceAll("\\s+", "-")
-                .replaceAll("-+", "-")
-            .replaceAll("^-", "")
-            .replaceAll("-$", "");
-
-        String candidate;
-        do {
-            byte[] bytes = new byte[2];
-            secureRandom.nextBytes(bytes);
-            String suffix = HexFormat.of().formatHex(bytes);
-            candidate = slug + "-" + suffix;
-            if (candidate.length() > 50) {
-                candidate = candidate.substring(0, 50);
-            }
-        } while (userRepository.existsByUsername(candidate));
-
-        return candidate;
+        return usernameGenerator.generateUniqueUsername(name);
     }
 }

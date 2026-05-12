@@ -11,16 +11,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.auth.config.SecurityConfig;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.LoginRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.auth.LogoutRequest;
-import id.ac.ui.cs.advprog.auth.dto.request.auth.RefreshTokenRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.RegisterRequest;
 import id.ac.ui.cs.advprog.auth.dto.request.auth.GoogleLoginRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginResponseData;
-import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginUserDto;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.RegisterResponseData;
-import id.ac.ui.cs.advprog.auth.dto.response.auth.TokenRefreshResponseData;
 import id.ac.ui.cs.advprog.auth.exception.DuplicateUserException;
-import id.ac.ui.cs.advprog.auth.exception.InvalidTokenException;
 import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.service.AuthService;
 import id.ac.ui.cs.advprog.auth.service.JwtService;
@@ -133,18 +128,10 @@ class AuthControllerTest {
                     .password("SecureP@ss123")
                     .build();
 
-            LoginUserDto userDto = LoginUserDto.builder()
-                    .id(UUID.randomUUID())
-                    .email("ahmad@example.com")
-                    .name("Ahmad Buruh")
-                    .role("BURUH")
-                    .build();
-
             LoginResponseData responseData = LoginResponseData.builder()
                     .accessToken("jwt-access-token")
-                    .refreshToken("raw-refresh-token")
                     .tokenType("Bearer")
-                    .expiresIn(900)
+                    .expiresIn(21600)
                     .build();
 
             when(authService.login(any(LoginRequest.class))).thenReturn(responseData);
@@ -191,9 +178,8 @@ class AuthControllerTest {
 
                         LoginResponseData responseData = LoginResponseData.builder()
                                         .accessToken("jwt-access-token")
-                                        .refreshToken("raw-refresh-token")
                                         .tokenType("Bearer")
-                                        .expiresIn(900)
+                                        .expiresIn(21600)
                                         .build();
 
                         when(authService.loginWithGoogle(any(GoogleLoginRequest.class))).thenReturn(responseData);
@@ -228,16 +214,10 @@ class AuthControllerTest {
 
         @Test
         void logoutReturns200OnSuccess() throws Exception {
-            LogoutRequest request = LogoutRequest.builder()
-                    .refreshToken("some-refresh-token")
-                    .build();
-
-            doNothing().when(authService).logout(any(LogoutRequest.class));
+            doNothing().when(authService).logout();
 
             mockMvc.perform(post("/api/v1/auth/logout")
-                            .with(user("testuser").roles("BURUH"))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
+                            .with(user("testuser").roles("BURUH")))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("success"))
                     .andExpect(jsonPath("$.message").value("Logout successful"));
@@ -245,63 +225,9 @@ class AuthControllerTest {
 
         @Test
         void logoutReturns401WithoutAuth() throws Exception {
-            LogoutRequest request = LogoutRequest.builder()
-                    .refreshToken("some-refresh-token")
-                    .build();
-
             mockMvc.perform(post("/api/v1/auth/logout")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
+                            .contentType(MediaType.APPLICATION_JSON))
                     .andExpect(status().isUnauthorized());
-        }
-    }
-
-    // ── Refresh ─────────────────────────────────────────────────────────
-
-    @Nested
-    class RefreshTests {
-
-        @Test
-        void refreshReturns200OnSuccess() throws Exception {
-            RefreshTokenRequest request = RefreshTokenRequest.builder()
-                    .refreshToken("old-refresh-token")
-                    .build();
-
-            TokenRefreshResponseData responseData = TokenRefreshResponseData.builder()
-                    .accessToken("new-access-token")
-                    .refreshToken("new-refresh-token")
-                    .tokenType("Bearer")
-                    .expiresIn(900)
-                    .build();
-
-            when(authService.refresh(any(RefreshTokenRequest.class)))
-                    .thenReturn(responseData);
-
-            mockMvc.perform(post("/api/v1/auth/refresh")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("success"))
-                    .andExpect(jsonPath("$.message").value("Token refreshed successfully"))
-                    .andExpect(jsonPath("$.data.accessToken").value("new-access-token"));
-        }
-
-        @Test
-        void refreshReturns401OnInvalidToken() throws Exception {
-            RefreshTokenRequest request = RefreshTokenRequest.builder()
-                    .refreshToken("invalid-token")
-                    .build();
-
-            when(authService.refresh(any(RefreshTokenRequest.class)))
-                    .thenThrow(new InvalidTokenException("Refresh token not found"));
-
-            mockMvc.perform(post("/api/v1/auth/refresh")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isUnauthorized())
-                                        .andExpect(jsonPath("$.status").value("error"))
-                                        .andExpect(jsonPath("$.field").doesNotExist())
-                                        .andExpect(jsonPath("$.message").value("Refresh token not found"));
         }
     }
 }

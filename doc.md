@@ -197,14 +197,12 @@ public ResponseEntity<?> getOrders(HttpServletRequest request) {
 The JWT is **NOT** automatically stored or sent. The client (frontend) must handle it:
 
 ```
-1. POST /api/v1/auth/login  →  { accessToken, refreshToken }
-2. Store tokens (localStorage, sessionStorage, or in-memory)
+1. POST /api/v1/auth/login  →  { accessToken }
+2. Store token (localStorage, sessionStorage, or in-memory)
 3. Attach to every request:
      Authorization: Bearer <accessToken>
-4. When accessToken expires (15 min):
-     POST /api/v1/auth/refresh  { refreshToken }  →  new tokens
-5. When refreshToken expires (7 days):
-     User must login again
+4. When accessToken expires (6 hours):
+    User must login again
 ```
 
 ### JavaScript Example
@@ -216,7 +214,7 @@ const res = await fetch("http://auth-service:8001/api/v1/auth/login", {
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ email: "user@example.com", password: "pass" })
 });
-const { accessToken, refreshToken } = (await res.json()).data;
+const { accessToken } = (await res.json()).data;
 
 // Call another service with the token
 const orders = await fetch("http://order-service:8002/api/v1/orders", {
