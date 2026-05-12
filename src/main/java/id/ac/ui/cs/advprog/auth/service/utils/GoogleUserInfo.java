@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.auth.service;
+package id.ac.ui.cs.advprog.auth.service.utils;
 
 public record GoogleUserInfo(
         String providerUserId,

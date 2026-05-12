@@ -105,9 +105,9 @@ class JwtAuthenticationFilterTest {
         loginReq.setServletPath("/api/v1/auth/login");
         assertTrue(filter.shouldNotFilter(loginReq));
 
-        MockHttpServletRequest refreshReq = new MockHttpServletRequest();
-        refreshReq.setServletPath("/api/v1/auth/refresh");
-        assertTrue(filter.shouldNotFilter(refreshReq));
+        MockHttpServletRequest googleReq = new MockHttpServletRequest();
+        googleReq.setServletPath("/api/v1/auth/google");
+        assertTrue(filter.shouldNotFilter(googleReq));
     }
 
     @Test

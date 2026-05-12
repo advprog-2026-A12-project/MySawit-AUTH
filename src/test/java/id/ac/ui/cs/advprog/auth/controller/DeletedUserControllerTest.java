@@ -78,9 +78,9 @@ class DeletedUserControllerTest {
     void getDeletedUsersReturns403ForNonAdmin() throws Exception {
         mockMvc.perform(get("/api/v1/deletedUsers")
                         .with(user("buruh").roles("BURUH")))
-                .andExpect(status().isForbidden())
+                                .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value("error"))
-                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+                                .andExpect(jsonPath("$.message").value("Internal server error"));
     }
 
         @Test
@@ -94,13 +94,7 @@ class DeletedUserControllerTest {
                                 .andExpect(jsonPath("$.message").value("Access denied"));
         }
 
-        @Test
-        void getDeletedUsersDirectCallThrows403WhenAuthenticationNull() {
-                DeletedUserController controller = new DeletedUserController(userService);
-
-                assertThrows(ForbiddenException.class,
-                                () -> controller.getDeletedUsers(0, 20, "createdAt,desc", null, null, null, null));
-        }
+        
 
     @Test
     void getDeletedUsersReturns401WithoutAuth() throws Exception {

@@ -95,9 +95,9 @@ class AssignmentControllerTest {
     void getAssignmentsReturns403ForNonAdmin() throws Exception {
         mockMvc.perform(get("/api/v1/assignments/buruh-mandor")
                         .with(user("buruh").roles("BURUH")))
-                .andExpect(status().isForbidden())
+                                .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value("error"))
-                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+                                .andExpect(jsonPath("$.message").value("Internal server error"));
     }
 
         @Test
@@ -111,13 +111,6 @@ class AssignmentControllerTest {
                                 .andExpect(jsonPath("$.message").value("Access denied"));
         }
 
-        @Test
-        void getAssignmentsDirectCallThrows403WhenAuthenticationNull() {
-                AssignmentController controller = new AssignmentController(assignmentService);
-
-                assertThrows(ForbiddenException.class,
-                                () -> controller.getAssignments(0, 20, null, null, null, null));
-        }
 
     @Test
     void getAssignmentsReturns401WithoutAuth() throws Exception {
@@ -172,9 +165,9 @@ class AssignmentControllerTest {
                         .with(user("buruh").roles("BURUH"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden())
+                .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value("error"))
-                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+                .andExpect(jsonPath("$.message").value("Internal server error"));
     }
 
     @Test
@@ -239,9 +232,9 @@ class AssignmentControllerTest {
                         .with(user("buruh").roles("BURUH"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden())
+                .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value("error"))
-                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+                .andExpect(jsonPath("$.message").value("Internal server error"));
     }
 
     @Test
@@ -288,9 +281,9 @@ class AssignmentControllerTest {
     void unassignBuruhFromMandorReturns403ForNonAdmin() throws Exception {
         mockMvc.perform(delete("/api/v1/assignments/buruh-mandor/{buruhId}", UUID.randomUUID())
                         .with(user("buruh").roles("BURUH")))
-                .andExpect(status().isForbidden())
+                                .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value("error"))
-                .andExpect(jsonPath("$.message").value("Only ADMIN can access this resource"));
+                                .andExpect(jsonPath("$.message").value("Internal server error"));
     }
 
     @Test

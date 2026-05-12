@@ -21,10 +21,14 @@ import id.ac.ui.cs.advprog.auth.exception.AssignmentConflictException;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
+import id.ac.ui.cs.advprog.auth.mapper.AssignmentResponseMapper;
+import id.ac.ui.cs.advprog.auth.mapper.AssignmentSpecificationBuilder;
 import id.ac.ui.cs.advprog.auth.model.BuruhMandorAssignment;
 import id.ac.ui.cs.advprog.auth.model.User;
 import id.ac.ui.cs.advprog.auth.repository.BuruhMandorAssignmentRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
+import id.ac.ui.cs.advprog.auth.validation.AssignmentValidator;
+import id.ac.ui.cs.advprog.auth.validation.AssignmentQueryValidator;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
@@ -58,7 +62,18 @@ class AssignmentServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        assignmentService = new AssignmentServiceImpl(assignmentRepository, userRepository);
+                AssignmentQueryValidator assignmentQueryValidator = new AssignmentQueryValidator();
+                AssignmentResponseMapper assignmentResponseMapper = new AssignmentResponseMapper();
+        AssignmentValidator assignmentPolicy = new AssignmentValidator(userRepository, assignmentRepository);
+        AssignmentSpecificationBuilder assignmentSpecificationBuilder = new AssignmentSpecificationBuilder();
+
+                assignmentService = new AssignmentServiceImpl(
+                                assignmentRepository,
+                                assignmentQueryValidator,
+                assignmentPolicy,
+                assignmentSpecificationBuilder,
+                                assignmentResponseMapper
+                );
     }
 
     @Test

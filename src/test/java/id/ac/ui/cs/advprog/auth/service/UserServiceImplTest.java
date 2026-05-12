@@ -15,15 +15,18 @@ import id.ac.ui.cs.advprog.auth.dto.response.management.DeletedUserResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
+import id.ac.ui.cs.advprog.auth.mapper.UserDetailAssembler;
+import id.ac.ui.cs.advprog.auth.mapper.UserResponseMapper;
 import id.ac.ui.cs.advprog.auth.model.BuruhMandorAssignment;
 import id.ac.ui.cs.advprog.auth.model.User;
 import id.ac.ui.cs.advprog.auth.repository.BuruhMandorAssignmentRepository;
-import id.ac.ui.cs.advprog.auth.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.auth.repository.UserRepository;
+import id.ac.ui.cs.advprog.auth.validation.UserQueryValidator;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -57,8 +60,6 @@ class UserServiceImplTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
-        @Mock
-        private RefreshTokenRepository refreshTokenRepository;
 
         @Mock
         private BuruhMandorAssignmentRepository buruhMandorAssignmentRepository;
@@ -70,12 +71,17 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-                userService = new UserServiceImpl(
-                                userRepository,
-                                refreshTokenRepository,
-                                buruhMandorAssignmentRepository,
-                                passwordEncoder
-                );
+        UserQueryValidator userQueryValidator = new UserQueryValidator();
+        UserResponseMapper userResponseMapper = new UserResponseMapper();
+        UserDetailAssembler userDetailAssembler = new UserDetailAssembler(buruhMandorAssignmentRepository);
+
+        userService = new UserServiceImpl(
+                userRepository,
+                passwordEncoder,
+                userQueryValidator,
+                userResponseMapper,
+                userDetailAssembler
+        );
     }
 
     @Test
@@ -693,7 +699,7 @@ class UserServiceImplTest {
         }
 
     @Test
-    void deleteUserSoftDeletesAndRemovesTokens() {
+    void deleteUserSoftDeletes() {
         UUID targetUserId = UUID.randomUUID();
         UUID adminId = UUID.randomUUID();
         User user = User.builder()
@@ -711,7 +717,6 @@ class UserServiceImplTest {
         assertEquals(targetUserId, response.getId());
         assertEquals("ahmad@example.com", response.getEmail());
         assertEquals("Ahmad Buruh", response.getName());
-        verify(refreshTokenRepository).deleteAllByUser(user);
     }
 
     @Test

@@ -4,7 +4,9 @@ import id.ac.ui.cs.advprog.auth.dto.request.management.UpdateMyProfileRequest;
 import id.ac.ui.cs.advprog.auth.dto.response.management.DeletedUserResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
+import java.util.List;
 import java.util.UUID;
 
 public interface UserService {
@@ -12,6 +14,8 @@ public interface UserService {
     UserPageResponseData getUsers(int page, int size, String sort, String name, String email, String role);
 
     UserPageResponseData getDeletedUsers(int page, int size, String sort, String name, String email, String role);
+
+    List<UserSummaryResponseData> getAllUsersForMandor();
 
     UserDetailResponseData getUserById(UUID userId);
 

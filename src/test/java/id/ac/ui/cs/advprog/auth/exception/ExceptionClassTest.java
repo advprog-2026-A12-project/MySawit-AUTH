@@ -87,20 +87,6 @@ class ExceptionClassTest {
     }
 
     @Test
-    void invalidTokenExceptionDefaultMessage() {
-        InvalidTokenException ex = new InvalidTokenException();
-        assertEquals("Token is invalid or expired", ex.getMessage());
-        assertEquals(HttpStatus.UNAUTHORIZED, ex.getHttpStatus());
-    }
-
-    @Test
-    void invalidTokenExceptionCustomMessage() {
-        InvalidTokenException ex = new InvalidTokenException("Refresh token revoked");
-        assertEquals("Refresh token revoked", ex.getMessage());
-        assertEquals(HttpStatus.UNAUTHORIZED, ex.getHttpStatus());
-    }
-
-    @Test
     void baseExceptionConstructorWithCauseWorks() {
         IllegalStateException cause = new IllegalStateException("root cause");
 
