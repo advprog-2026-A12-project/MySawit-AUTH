@@ -116,7 +116,6 @@ jobs:
           test -n "${{ secrets.EC2_HOST }}" || (echo "Missing secret EC2_HOST" && exit 1)
           test -n "${{ secrets.EC2_USERNAME }}" || (echo "Missing secret EC2_USERNAME" && exit 1)
           test -n "${{ secrets.EC2_SSH_PRIVATE_KEY }}" || (echo "Missing secret EC2_SSH_PRIVATE_KEY" && exit 1)
-          test -n "${{ secrets.EC2_HOST_FINGERPRINT }}" || (echo "Missing secret EC2_HOST_FINGERPRINT" && exit 1)
 
       - name: Deploy container to EC2 via SSH
         uses: appleboy/ssh-action@v1.2.5
@@ -147,7 +146,6 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           port: ${{ secrets.EC2_PORT || 22 }}
-          fingerprint: ${{ secrets.EC2_HOST_FINGERPRINT }}
           envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,IMAGE,CONTAINER_NAME,HOST_PORT,CONTAINER_PORT,ENV_FILE_PATH,HEALTHCHECK_URL,APP_PROFILE,SERVER_PORT,ADMIN_INITIAL_SECRET,DB_URL,DB_USER,DB_PASSWORD,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD
           script: |
             set -euo pipefail
