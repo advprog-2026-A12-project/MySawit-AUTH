@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.auth.service.authprovider;
 
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
+import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.model.User;
@@ -38,7 +39,7 @@ public class GoogleAuthProvider implements AuthProvider {
 
         User user = userRepository
                 .findByOauthProviderAndOauthProviderId(GOOGLE, googleUserInfo.providerUserId())
-                .orElseGet(() -> findOrCreateGoogleUser(googleUserInfo));
+            .orElseGet(() -> findOrCreateGoogleUser(googleUserInfo, googleRequest.role(), googleRequest.mandorCertificationNumber()));
 
         if (!user.isActive()) {
             throw new UnauthorizedException("Account is deactivated");
@@ -47,10 +48,14 @@ public class GoogleAuthProvider implements AuthProvider {
         return user;
     }
 
-    private User findOrCreateGoogleUser(GoogleUserInfo googleUserInfo) {
+        private User findOrCreateGoogleUser(
+            GoogleUserInfo googleUserInfo,
+            String requestedRole,
+            String mandorCertificationNumber
+        ) {
         return userRepository.findByEmail(googleUserInfo.email())
                 .map(existingUser -> linkGoogleAccount(existingUser, googleUserInfo))
-                .orElseGet(() -> createGoogleUser(googleUserInfo));
+            .orElseGet(() -> createGoogleUser(googleUserInfo, requestedRole, mandorCertificationNumber));
     }
 
     private User linkGoogleAccount(User existingUser, GoogleUserInfo googleUserInfo) {
@@ -70,23 +75,49 @@ public class GoogleAuthProvider implements AuthProvider {
         return existingUser;
     }
 
-    private User createGoogleUser(GoogleUserInfo googleUserInfo) {
+    private User createGoogleUser(GoogleUserInfo googleUserInfo, String requestedRole, String mandorCertificationNumber) {
         String name = (googleUserInfo.name() == null || googleUserInfo.name().isBlank())
                 ? googleUserInfo.email()
                 : googleUserInfo.name();
         String username = usernameGenerator.generateUniqueUsername(name);
+
+        UserRole role = resolveRequestedRole(requestedRole, mandorCertificationNumber);
 
         User user = User.builder()
                 .username(username)
                 .email(googleUserInfo.email())
                 .name(name)
                 .passwordHash(null)
-                .role(UserRole.BURUH)
+                .role(role)
+                .mandorCertificationNumber(role == UserRole.MANDOR ? mandorCertificationNumber : null)
                 .oauthProvider(GOOGLE)
                 .oauthProviderId(googleUserInfo.providerUserId())
                 .isActive(true)
                 .build();
 
         return userRepository.save(user);
+    }
+
+    private UserRole resolveRequestedRole(String requestedRole, String mandorCertificationNumber) {
+        if (requestedRole == null || requestedRole.isBlank()) {
+            return UserRole.BURUH;
+        }
+
+        UserRole role;
+        try {
+            role = UserRole.valueOf(requestedRole.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidUserRequestException("Invalid role: " + requestedRole);
+        }
+
+        if (role == UserRole.ADMIN) {
+            throw new UnprocessableEntityException("ADMIN role is not allowed for registration");
+        }
+
+        if (role == UserRole.MANDOR && (mandorCertificationNumber == null || mandorCertificationNumber.isBlank())) {
+            throw new UnprocessableEntityException("mandorCertificationNumber is required for MANDOR role");
+        }
+
+        return role;
     }
 }

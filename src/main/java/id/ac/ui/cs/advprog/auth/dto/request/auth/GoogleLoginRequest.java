@@ -16,4 +16,8 @@ public class GoogleLoginRequest {
     private String authorizationCode;
 
     private String redirectUri;
+
+    private String role;
+
+    private String mandorCertificationNumber;
 }
