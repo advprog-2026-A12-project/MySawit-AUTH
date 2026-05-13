@@ -517,6 +517,34 @@ class AuthServiceImplTest {
             assertEquals("blank@example.com", userCaptor.getValue().getName());
             assertEquals(UserRole.BURUH, userCaptor.getValue().getRole());
         }
+
+        @Test
+        void loginWithGoogleCreatesMandorWhenRoleIsMandor() {
+            GoogleLoginRequest request = GoogleLoginRequest.builder()
+                    .authorizationCode("google-auth-code")
+                    .redirectUri("postmessage")
+                    .role("MANDOR")
+                    .mandorCertificationNumber("CERT-12345")
+                    .build();
+
+            when(oauthClient.authenticate("google-auth-code", "postmessage"))
+                    .thenReturn(new GoogleUserInfo("google-sub-mandor", "mandor@example.com", "Mandor User"));
+            when(userRepository.findByOauthProviderAndOauthProviderId("GOOGLE", "google-sub-mandor"))
+                    .thenReturn(Optional.empty());
+            when(userRepository.findByEmail("mandor@example.com")).thenReturn(Optional.empty());
+            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+
+            ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+            when(userRepository.save(userCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+            when(jwtService.generateAccessToken(any(User.class))).thenReturn("access-jwt");
+            when(jwtService.getAccessTokenExpiration()).thenReturn(21600L);
+
+            authService.loginWithGoogle(request);
+
+            assertEquals(UserRole.MANDOR, userCaptor.getValue().getRole());
+            assertEquals("CERT-12345", userCaptor.getValue().getMandorCertificationNumber());
+        }
     }
 
     // ── Username generation ─────────────────────────────────────────────

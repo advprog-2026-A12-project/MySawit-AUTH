@@ -1,60 +1,36 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-# This workflow helps you trigger a SonarCloud analysis of your code and populates
-# GitHub Code Scanning alerts with the vulnerabilities found.
-# Free for open source project.
-
-# 1. Login to SonarCloud.io using your GitHub account
-
-# 2. Import your project on SonarCloud
-#     * Add your GitHub organization first, then add your repository as a new project.
-#     * Please note that many languages are eligible for automatic analysis,
-#       which means that the analysis will start automatically without the need to set up GitHub Actions.
-#     * This behavior can be changed in Administration > Analysis Method.
-#
-# 3. Follow the SonarCloud in-product tutorial
-#     * a. Copy/paste the Project Key and the Organization Key into the args parameter below
-#          (You'll find this information in SonarCloud. Click on "Information" at the bottom left)
-#
-#     * b. Generate a new token and add it to your Github repository's secrets using the name SONAR_TOKEN
-#          (On SonarCloud, click on your avatar on top-right > My account > Security
-#           or go directly to https://sonarcloud.io/account/security/)
-
-# Feel free to take a look at our documentation (https://docs.sonarcloud.io/getting-started/github/)
-# or reach out to our community forum if you need some help (https://community.sonarsource.com/c/help/sc/9)
-
-name: Deployment
+name: CI-CD
 
 on:
   push:
-    branches: [ "main", "staging" ]
+    branches: ["main", "staging"]
   pull_request:
-    branches: [ "main", "staging"]
+    branches: ["main", "staging"]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: write 
+  pull-requests: write
   security-events: write
 
+concurrency:
+  group: auth-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  Analysis:
+  analysis:
     runs-on: ubuntu-latest
     env:
       POSTGRES_DB: authdb_test
-      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER_TEST }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_TEST }}
       POSTGRES_PORT: 6001
     services:
       postgres:
         image: postgres:15-alpine
         env:
           POSTGRES_DB: authdb_test
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER_TEST }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_TEST }}
         ports:
           - 6001:5432
         options: >-
@@ -65,15 +41,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          java-version: "21"
+          distribution: "temurin"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -89,15 +65,148 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_AUTH }}
 
-  deploy:
-    needs: Analysis
+  deploy_staging:
+    needs: analysis
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && needs.Analysis.result == 'success' && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     steps:
-      - name: Deploy to Staging
-        if: github.ref == 'refs/heads/staging'
-        run: echo "Deploying to STAGING environment..."
+      - name: Deploy to Staging (skeleton only)
+        run: |
+          echo "Deploying to STAGING environment..."
+          echo "Skeleton only: no real deployment action is executed."
 
-      - name: Deploy to Production
-        if: github.ref == 'refs/heads/main'
-        run: echo "Deploying to PRODUCTION environment..."
+  deploy_production:
+    needs: analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+    steps:
+      - name: Validate Docker Hub configuration
+        run: |
+          test -n "${{ vars.DOCKERHUB_REPOSITORY }}" || (echo "Missing repository variable DOCKERHUB_REPOSITORY (example: username/auth-service)" && exit 1)
+          test -n "${{ secrets.DOCKERHUB_USERNAME }}" || (echo "Missing secret DOCKERHUB_USERNAME" && exit 1)
+          test -n "${{ secrets.DOCKERHUB_TOKEN }}" || (echo "Missing secret DOCKERHUB_TOKEN" && exit 1)
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ vars.DOCKERHUB_REPOSITORY }}:sha-${{ github.sha }}
+            ${{ vars.DOCKERHUB_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Validate EC2 deployment configuration
+        run: |
+          test -n "${{ secrets.EC2_HOST }}" || (echo "Missing secret EC2_HOST" && exit 1)
+          test -n "${{ secrets.EC2_USERNAME }}" || (echo "Missing secret EC2_USERNAME" && exit 1)
+          test -n "${{ secrets.EC2_SSH_PRIVATE_KEY }}" || (echo "Missing secret EC2_SSH_PRIVATE_KEY" && exit 1)
+          test -n "${{ secrets.EC2_HOST_FINGERPRINT }}" || (echo "Missing secret EC2_HOST_FINGERPRINT" && exit 1)
+
+      - name: Deploy container to EC2 via SSH
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          IMAGE: ${{ vars.DOCKERHUB_REPOSITORY }}:sha-${{ github.sha }}
+          CONTAINER_NAME: ${{ vars.EC2_CONTAINER_NAME || 'auth-app' }}
+          HOST_PORT: ${{ vars.EC2_HOST_PORT || '8001' }}
+          CONTAINER_PORT: ${{ vars.EC2_CONTAINER_PORT || '8001' }}
+          ENV_FILE_PATH: ${{ vars.EC2_ENV_FILE_PATH || '/opt/auth/.env' }}
+          HEALTHCHECK_URL: ${{ vars.EC2_HEALTHCHECK_URL || '' }}
+          APP_PROFILE: ${{ vars.APP_PROFILE || '' }}
+          SERVER_PORT: ${{ vars.SERVER_PORT || '' }}
+          ADMIN_INITIAL_SECRET: ${{ secrets.ADMIN_INITIAL_SECRET || '' }}
+          DB_URL: ${{ vars.DB_URL || '' }}
+          DB_USER: ${{ vars.DB_USER || vars.DB_USER_DEV || '' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD || secrets.DB_PASSWORD_DEV || '' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET || '' }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID || '' }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET || '' }}
+          GOOGLE_REDIRECT_URI: ${{ vars.GOOGLE_REDIRECT_URI || '' }}
+          POSTGRES_DB: ${{ vars.POSTGRES_DB || '' }}
+          POSTGRES_USER: ${{ vars.POSTGRES_USER || '' }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || '' }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          fingerprint: ${{ secrets.EC2_HOST_FINGERPRINT }}
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,IMAGE,CONTAINER_NAME,HOST_PORT,CONTAINER_PORT,ENV_FILE_PATH,HEALTHCHECK_URL,APP_PROFILE,SERVER_PORT,ADMIN_INITIAL_SECRET,DB_URL,DB_USER,DB_PASSWORD,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD
+          script: |
+            set -euo pipefail
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker pull "$IMAGE"
+
+            docker stop "$CONTAINER_NAME" || true
+            docker rm "$CONTAINER_NAME" || true
+
+            run_env_args=()
+            for key in APP_PROFILE SERVER_PORT ADMIN_INITIAL_SECRET DB_URL DB_USER DB_PASSWORD JWT_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD; do
+              val="${!key:-}"
+              if [ -n "$val" ]; then
+                run_env_args+=(-e "$key=$val")
+              fi
+            done
+
+            env_file_args=()
+            if [ -n "${ENV_FILE_PATH:-}" ] && [ -f "$ENV_FILE_PATH" ]; then
+              env_file_args+=(--env-file "$ENV_FILE_PATH")
+              echo "Using env file: $ENV_FILE_PATH"
+            else
+              echo "ENV file not found or not set; deploying with GitHub-provided env only"
+            fi
+
+            docker run -d \
+              --name "$CONTAINER_NAME" \
+              --restart unless-stopped \
+              "${env_file_args[@]}" \
+              "${run_env_args[@]}" \
+              -p "$HOST_PORT:$CONTAINER_PORT" \
+              "$IMAGE"
+
+            # Verify container is running
+            sleep 5
+            if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" != "true" ]; then
+              echo "Container is not running"
+              docker ps -a --filter "name=$CONTAINER_NAME"
+              docker logs --tail 200 "$CONTAINER_NAME" || true
+              exit 1
+            fi
+
+            # Optional HTTP healthcheck with retries
+            if [ -n "${HEALTHCHECK_URL}" ]; then
+              i=1
+              until [ "$i" -gt 12 ]
+              do
+                if curl -fsS --max-time 5 "$HEALTHCHECK_URL" >/dev/null; then
+                  echo "Healthcheck passed: $HEALTHCHECK_URL"
+                  break
+                fi
+                if [ "$i" -eq 12 ]; then
+                  echo "Healthcheck failed: $HEALTHCHECK_URL"
+                  docker logs --tail 200 "$CONTAINER_NAME" || true
+                  exit 1
+                fi
+                sleep 5
+                i=$((i+1))
+              done
+            fi
+
+            docker image prune -f

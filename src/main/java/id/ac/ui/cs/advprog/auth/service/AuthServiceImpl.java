@@ -73,7 +73,12 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponseData loginWithGoogle(GoogleLoginRequest request) {
         User user = authenticate(
                 AuthProviderType.GOOGLE,
-                new GoogleAuthRequest(request.getAuthorizationCode(), request.getRedirectUri())
+            new GoogleAuthRequest(
+                request.getAuthorizationCode(),
+                request.getRedirectUri(),
+                request.getRole(),
+                request.getMandorCertificationNumber()
+            )
         );
         IssuedTokens tokens = authTokenIssuer.issue(user);
         return authResponseMapper.toLoginResponse(tokens);
@@ -87,7 +92,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void logout() {
-        // Stateless JWT: nothing to revoke server-side.
+    
     }
 
     String generateUniqueUsername(String name) {
