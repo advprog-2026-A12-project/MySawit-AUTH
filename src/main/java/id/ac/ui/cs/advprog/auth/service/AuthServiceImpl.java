@@ -53,7 +53,6 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         User saved = userRepository.save(user);
-
         return authResponseMapper.toRegisterResponse(saved);
     }
 

@@ -23,5 +23,3 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-postmessage}
       
 
-volumes:
-  postgres-data:
