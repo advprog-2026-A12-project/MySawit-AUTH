@@ -2,6 +2,9 @@ package id.ac.ui.cs.advprog.auth.security;
 
 import id.ac.ui.cs.advprog.auth.service.JwtService;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +24,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final MeterRegistry meterRegistry;
 
     @Override
     protected void doFilterInternal(
@@ -36,11 +40,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-
-        if (!jwtService.isTokenValid(token)) {
-            filterChain.doFilter(request, response);
-            return;
-        }
 
         try {
             Claims claims = jwtService.extractAllClaims(token);
@@ -62,8 +61,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            meterRegistry.counter("auth_jwt_validation_total", "result", "success").increment();
+        } catch (ExpiredJwtException ex) {
+            meterRegistry.counter("auth_jwt_validation_total", "result", "expired").increment();
+            SecurityContextHolder.clearContext();
+            filterChain.doFilter(request, response);
+            return;
+        } catch (JwtException | IllegalArgumentException ex) {
+            meterRegistry.counter("auth_jwt_validation_total", "result", "invalid").increment();
+            SecurityContextHolder.clearContext();
+            filterChain.doFilter(request, response);
+            return;
         } catch (RuntimeException ex) {
             // Treat malformed claims as unauthenticated instead of surfacing 500.
+            meterRegistry.counter("auth_jwt_validation_total", "result", "error").increment();
             SecurityContextHolder.clearContext();
             filterChain.doFilter(request, response);
             return;
