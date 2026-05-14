@@ -7,7 +7,6 @@ import id.ac.ui.cs.advprog.auth.service.JwtService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -33,10 +32,8 @@ public class SecurityConfig {
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(
-            JwtService jwtService,
-            MeterRegistry meterRegistry) {
-        return new JwtAuthenticationFilter(jwtService, meterRegistry);
+    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtService jwtService) {
+        return new JwtAuthenticationFilter(jwtService);
     }
 
     @Bean
