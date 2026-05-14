@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.http.MediaType;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -114,7 +115,7 @@ public class SecurityConfig {
             config.setAllowCredentials(false);
             source.registerCorsConfiguration("/**", config);
             FilterRegistrationBean<CorsFilter> bean = new FilterRegistrationBean<>(new CorsFilter(source));
-            bean.setOrder(0);
+            bean.setOrder(Ordered.HIGHEST_PRECEDENCE);
             return bean;
         }
 }
