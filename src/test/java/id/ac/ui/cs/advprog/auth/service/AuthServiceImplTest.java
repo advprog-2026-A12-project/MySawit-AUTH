@@ -31,6 +31,8 @@ import id.ac.ui.cs.advprog.auth.service.authprovider.GoogleAuthProvider;
 import id.ac.ui.cs.advprog.auth.service.authprovider.PasswordAuthProvider;
 import id.ac.ui.cs.advprog.auth.service.oauth.OAuthClient;
 import id.ac.ui.cs.advprog.auth.validation.RegistrationValidator;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -53,6 +55,7 @@ class AuthServiceImplTest {
         @Mock private PasswordEncoder passwordEncoder;
 
         private AuthServiceImpl authService;
+    private MeterRegistry meterRegistry;
 
     private User sampleUser;
 
@@ -62,6 +65,7 @@ class AuthServiceImplTest {
         UsernameGenerator usernameGenerator = new UsernameGenerator(userRepository);
         AuthTokenIssuer authTokenIssuer = new AuthTokenIssuer(jwtService);
         AuthResponseMapper authResponseMapper = new AuthResponseMapper();
+        meterRegistry = new SimpleMeterRegistry();
 
         AuthProviderFactory authProviderFactory = new DefaultAuthProviderFactory(
                 List.of(
@@ -77,7 +81,8 @@ class AuthServiceImplTest {
                 usernameGenerator,
                 authTokenIssuer,
                 authProviderFactory,
-                authResponseMapper
+                authResponseMapper,
+                meterRegistry
         );
 
         sampleUser = User.builder()

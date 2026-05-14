@@ -19,6 +19,7 @@ import id.ac.ui.cs.advprog.auth.service.utils.AuthTokenIssuer;
 import id.ac.ui.cs.advprog.auth.service.utils.IssuedTokens;
 import id.ac.ui.cs.advprog.auth.service.utils.UsernameGenerator;
 import id.ac.ui.cs.advprog.auth.validation.RegistrationValidator;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,53 +36,75 @@ public class AuthServiceImpl implements AuthService {
     private final AuthTokenIssuer authTokenIssuer;
     private final AuthProviderFactory authProviderFactory;
     private final AuthResponseMapper authResponseMapper;
+    private final MeterRegistry meterRegistry;
 
     @Override
     @Transactional
     public RegisterResponseData register(RegisterRequest request) {
-        UserRole role = registrationValidator.validate(request);
-        String username = usernameGenerator.generateUniqueUsername(request.getName());
+        try {
+            UserRole role = registrationValidator.validate(request);
+            String username = usernameGenerator.generateUniqueUsername(request.getName());
 
-        User user = User.builder()
-                .username(username)
-                .email(request.getEmail())
-                .name(request.getName())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(role)
-                .mandorCertificationNumber(request.getMandorCertificationNumber())
-                .isActive(true)
-                .build();
+            User user = User.builder()
+                    .username(username)
+                    .email(request.getEmail())
+                    .name(request.getName())
+                    .passwordHash(passwordEncoder.encode(request.getPassword()))
+                    .role(role)
+                    .mandorCertificationNumber(request.getMandorCertificationNumber())
+                    .isActive(true)
+                    .build();
 
-        User saved = userRepository.save(user);
-
-        return authResponseMapper.toRegisterResponse(saved);
+            User saved = userRepository.save(user);
+            meterRegistry.counter("auth_register_total", "result", "success").increment();
+            return authResponseMapper.toRegisterResponse(saved);
+        } catch (RuntimeException ex) {
+            meterRegistry.counter("auth_register_total", "result", "failure").increment();
+            throw ex;
+        }
     }
 
     @Override
     @Transactional
     public LoginResponseData login(LoginRequest request) {
-        User user = authenticate(
-                AuthProviderType.PASSWORD,
-                new PasswordAuthRequest(request.getEmail(), request.getPassword())
-        );
-        IssuedTokens tokens = authTokenIssuer.issue(user);
-        return authResponseMapper.toLoginResponse(tokens);
+        try {
+            User user = authenticate(
+                    AuthProviderType.PASSWORD,
+                    new PasswordAuthRequest(request.getEmail(), request.getPassword())
+            );
+            IssuedTokens tokens = authTokenIssuer.issue(user);
+            meterRegistry.counter(
+                    "auth_login_total", "provider", "password", "result", "success").increment();
+            return authResponseMapper.toLoginResponse(tokens);
+        } catch (RuntimeException ex) {
+            meterRegistry.counter(
+                    "auth_login_total", "provider", "password", "result", "failure").increment();
+            throw ex;
+        }
     }
 
     @Override
     @Transactional
     public LoginResponseData loginWithGoogle(GoogleLoginRequest request) {
-        User user = authenticate(
-                AuthProviderType.GOOGLE,
-            new GoogleAuthRequest(
-                request.getAuthorizationCode(),
-                request.getRedirectUri(),
-                request.getRole(),
-                request.getMandorCertificationNumber()
-            )
-        );
-        IssuedTokens tokens = authTokenIssuer.issue(user);
-        return authResponseMapper.toLoginResponse(tokens);
+        try {
+            User user = authenticate(
+                    AuthProviderType.GOOGLE,
+                    new GoogleAuthRequest(
+                        request.getAuthorizationCode(),
+                        request.getRedirectUri(),
+                        request.getRole(),
+                        request.getMandorCertificationNumber()
+                    )
+            );
+            IssuedTokens tokens = authTokenIssuer.issue(user);
+            meterRegistry.counter(
+                    "auth_login_total", "provider", "google", "result", "success").increment();
+            return authResponseMapper.toLoginResponse(tokens);
+        } catch (RuntimeException ex) {
+            meterRegistry.counter(
+                    "auth_login_total", "provider", "google", "result", "failure").increment();
+            throw ex;
+        }
     }
 
     private User authenticate(AuthProviderType type, AuthRequest request) {

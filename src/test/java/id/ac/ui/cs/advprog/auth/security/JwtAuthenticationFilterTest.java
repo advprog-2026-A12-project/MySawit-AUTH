@@ -9,6 +9,9 @@ import static org.mockito.Mockito.when;
 
 import id.ac.ui.cs.advprog.auth.service.JwtService;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,12 +29,27 @@ class JwtAuthenticationFilterTest {
     @Mock private JwtService jwtService;
     @Mock private FilterChain filterChain;
     @Mock private Claims claims;
+    @Mock private MeterRegistry meterRegistry;
+    @Mock private Counter counter;
 
     private JwtAuthenticationFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(jwtService);
+        when(meterRegistry.counter(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.<String>any()))
+                .thenReturn(counter);
+        when(meterRegistry.counter(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.<String>any(),
+                org.mockito.ArgumentMatchers.<String>any()))
+                .thenReturn(counter);
+        when(meterRegistry.counter(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.<String>any(),
+                org.mockito.ArgumentMatchers.<String>any(),
+                org.mockito.ArgumentMatchers.<String>any(),
+                org.mockito.ArgumentMatchers.<String>any()))
+                .thenReturn(counter);
+        filter = new JwtAuthenticationFilter(jwtService, meterRegistry);
         SecurityContextHolder.clearContext();
     }
 
@@ -64,7 +82,7 @@ class JwtAuthenticationFilterTest {
         request.addHeader("Authorization", "Bearer invalid-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        when(jwtService.isTokenValid("invalid-token")).thenReturn(false);
+        when(jwtService.extractAllClaims("invalid-token")).thenThrow(new JwtException("invalid"));
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -82,7 +100,6 @@ class JwtAuthenticationFilterTest {
         when(claims.getSubject()).thenReturn(userId.toString());
         when(claims.get("role", String.class)).thenReturn("BURUH");
 
-        when(jwtService.isTokenValid("valid-token")).thenReturn(true);
         when(jwtService.extractAllClaims("valid-token")).thenReturn(claims);
 
         filter.doFilterInternal(request, response, filterChain);
