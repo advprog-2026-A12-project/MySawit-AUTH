@@ -1,0 +1,134 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Service Up",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "targets": [{"expr": "max(up{job=\"auth-app\"})", "refId": "A"}],
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}
+    },
+    {
+      "type": "stat",
+      "title": "Request Rate (req/s)",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "targets": [{"expr": "sum(rate(http_server_requests_seconds_count{job=\"auth-app\"}[5m]))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "reqps"}}
+    },
+    {
+      "type": "stat",
+      "title": "Error Rate (5xx %)",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "targets": [{"expr": "100 * (sum(rate(http_server_requests_seconds_count{job=\"auth-app\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"auth-app\"}[5m])), 1e-9))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percent"}}
+    },
+    {
+      "type": "stat",
+      "title": "P95 Latency",
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"auth-app\"}[5m])) by (le))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "stat",
+      "title": "P99 Latency",
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "targets": [{"expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=\"auth-app\"}[5m])) by (le))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "stat",
+      "title": "Uptime",
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+      "targets": [{"expr": "process_uptime_seconds{job=\"auth-app\"}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Request Rate by Status",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 4},
+      "targets": [{"expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"auth-app\"}[5m]))", "legendFormat": "{{status}}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Latency p95/p99",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 4},
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"auth-app\"}[5m])) by (le))", "legendFormat": "p95", "refId": "A"},
+        {"expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=\"auth-app\"}[5m])) by (le))", "legendFormat": "p99", "refId": "B"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "JVM Heap/Non-Heap Memory",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 4},
+      "targets": [
+        {"expr": "sum by (area) (jvm_memory_used_bytes{job=\"auth-app\"})", "legendFormat": "{{area}}", "refId": "A"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "bytes"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "JVM GC Pause (sum rate)",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 12},
+      "targets": [{"expr": "sum(rate(jvm_gc_pause_seconds_sum{job=\"auth-app\"}[5m]))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "JVM Threads by State",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 12},
+      "targets": [{"expr": "sum by (state) (jvm_threads_states_threads{job=\"auth-app\"})", "legendFormat": "{{state}}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Process CPU Usage",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 12},
+      "targets": [{"expr": "process_cpu_usage{job=\"auth-app\"}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Open File Descriptors",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 20},
+      "targets": [{"expr": "process_files_open_files{job=\"auth-app\"}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Hikari Connections",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 20},
+      "targets": [
+        {"expr": "hikaricp_connections{job=\"auth-app\"}", "legendFormat": "total", "refId": "A"},
+        {"expr": "hikaricp_connections_active{job=\"auth-app\"}", "legendFormat": "active", "refId": "B"},
+        {"expr": "hikaricp_connections_idle{job=\"auth-app\"}", "legendFormat": "idle", "refId": "C"},
+        {"expr": "hikaricp_connections_pending{job=\"auth-app\"}", "legendFormat": "pending", "refId": "D"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Hikari Pool Usage %",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 20},
+      "targets": [{"expr": "100 * hikaricp_connections_active{job=\"auth-app\"} / clamp_min(hikaricp_connections{job=\"auth-app\"}, 1)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percent"}}
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["auth", "spring", "micrometer"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Auth Service Overview",
+  "uid": "auth-service-overview",
+  "version": 1,
+  "weekStart": ""
+}
