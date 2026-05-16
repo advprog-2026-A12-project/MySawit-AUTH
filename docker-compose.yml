@@ -3,6 +3,9 @@ services:
     build: .
     container_name: auth-app
     restart: unless-stopped
+    cpus: "1.0"
+    mem_limit: 1024m
+    mem_reservation: 768m
     env_file:
       - .env
     ports:
@@ -11,15 +14,16 @@ services:
       APP_PROFILE: ${APP_PROFILE:-dev} 
       SERVER_PORT: ${SERVER_PORT:-8001}
       ADMIN_INITIAL_SECRET: ${ADMIN_INITIAL_SECRET:-admin123}
-      DB_URL_DEV: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-auth_db_dev}
-      DB_USER_DEV: ${POSTGRES_USER:-postgres}
-      DB_PASSWORD_DEV: ${POSTGRES_PASSWORD:-postgres}
-      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-auth_db_dev}
-      DB_USER: ${POSTGRES_USER:-postgres}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_URL_DEV: ${DB_URL_DEV}
+      DB_USER_DEV: ${DB_USER_DEV}
+      DB_PASSWORD_DEV: ${DB_PASSWORD_DEV}
+      DB_URL: ${DB_URL}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:-secret}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-postmessage}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:-}
       
 
