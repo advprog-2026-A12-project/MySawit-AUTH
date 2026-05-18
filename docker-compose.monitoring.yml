@@ -3,6 +3,9 @@ services:
     image: prom/prometheus:v2.54.1
     container_name: auth-prometheus
     restart: unless-stopped
+    cpus: "0.5"
+    mem_limit: 512m
+    mem_reservation: 384m
     ports:
       - "9090:9090"
     extra_hosts:
@@ -14,6 +17,9 @@ services:
     image: grafana/grafana:11.2.2
     container_name: auth-grafana
     restart: unless-stopped
+    cpus: "0.5"
+    mem_limit: 512m
+    mem_reservation: 384m
     depends_on:
       - prometheus
     ports:
