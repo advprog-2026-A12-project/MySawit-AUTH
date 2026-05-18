@@ -59,7 +59,7 @@ public class AssignmentController {
                 .body(BaseResponse.success("Buruh assigned to Mandor successfully", data));
     }
 
-    @PutMapping("/buruh-mandor/{buruhId}")
+    @PutMapping({"/buruh-mandor/{buruhId}", "/buruh-mandor/{buruhId}/reassign"})
     public ResponseEntity<BaseResponse<BuruhMandorReassignmentResponseData>> reassignBuruhToMandor(
             @PathVariable UUID buruhId,
             @Valid @RequestBody ReassignBuruhMandorRequest request

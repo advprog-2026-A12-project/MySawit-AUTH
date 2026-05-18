@@ -3,10 +3,14 @@ package id.ac.ui.cs.advprog.auth.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 @Slf4j
@@ -50,13 +54,71 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
+    @ExceptionHandler({
+        AccessDeniedException.class
+    })
+    public ResponseEntity<ErrorResponse> handleAccessDenied(Exception ex) {
+        log.warn("Access denied: {}", ex.getMessage());
+        ErrorResponse body = ErrorResponse.of("authorization", "Access denied");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    @ExceptionHandler({
+        AuthenticationException.class,
+        AuthenticationCredentialsNotFoundException.class
+    })
+    public ResponseEntity<ErrorResponse> handleAuthentication(Exception ex) {
+        log.warn("Authentication failure: {}", ex.getMessage());
+        ErrorResponse body = ErrorResponse.of("authorization", "Unauthorized");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException ex) {
+        ErrorResponse body = ErrorResponse.of("resource", "Resource not found");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
     /**
      * Catch-all for any unexpected exception.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
+        if (isAuthorizationException(ex)) {
+            ErrorResponse body = ErrorResponse.of("authorization", "Access denied");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+        }
+        if (isAuthenticationException(ex)) {
+            ErrorResponse body = ErrorResponse.of("authorization", "Unauthorized");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+        }
         log.error("Unhandled exception", ex);
         ErrorResponse body = ErrorResponse.of("general", "Internal server error");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
+    private boolean isAuthorizationException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof AccessDeniedException) {
+                return true;
+            }
+            if ("AuthorizationDeniedException".equals(current.getClass().getSimpleName())) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isAuthenticationException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof AuthenticationException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

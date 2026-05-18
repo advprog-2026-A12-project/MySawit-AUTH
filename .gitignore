@@ -46,6 +46,6 @@ data/
 .env.dev
 .env.prod
 
-
+analysis.md
 api-auth.md
 database-design.md

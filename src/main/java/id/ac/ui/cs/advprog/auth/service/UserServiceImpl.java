@@ -7,6 +7,7 @@ import id.ac.ui.cs.advprog.auth.dto.response.management.UserDetailResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UserSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.UpdatedMyProfileResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
+import id.ac.ui.cs.advprog.auth.exception.DuplicateUserException;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
@@ -117,11 +118,19 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
+        boolean hasUsernameUpdate = request.getUsername() != null && !request.getUsername().isBlank();
         boolean hasNameUpdate = request.getName() != null && !request.getName().isBlank();
         boolean hasPasswordUpdate = request.getPassword() != null && !request.getPassword().isBlank();
 
-        if (!hasNameUpdate && !hasPasswordUpdate) {
-            throw new InvalidUserRequestException("At least one of name or password must be provided");
+        if (!hasUsernameUpdate && !hasNameUpdate && !hasPasswordUpdate) {
+            throw new InvalidUserRequestException("At least one of username, name or password must be provided");
+        }
+
+        if (hasUsernameUpdate) {
+            if (userRepository.existsByUsernameAndIdNot(request.getUsername(), userId)) {
+                throw new DuplicateUserException("Username");
+            }
+            user.setUsername(request.getUsername());
         }
 
         if (hasNameUpdate) {
