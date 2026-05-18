@@ -6,6 +6,7 @@ import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentRes
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentPageResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorUnassignmentResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.MandorBuruhPageResponseData;
 import java.util.UUID;
 
 public interface AssignmentService {
@@ -23,4 +24,6 @@ public interface AssignmentService {
     BuruhMandorReassignmentResponseData reassignBuruhToMandor(UUID buruhId, ReassignBuruhMandorRequest request);
 
     BuruhMandorUnassignmentResponseData unassignBuruhFromMandor(UUID buruhId);
+
+    MandorBuruhPageResponseData getBuruhsByMandor(UUID mandorId, int page, int size, String name);
 }

@@ -17,17 +17,13 @@ public class UserListAccessPolicy {
             throw new ForbiddenException();
         }
 
-        boolean hasAdminRole = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch("ROLE_ADMIN"::equals);
+        boolean hasAdminRole = hasRole(authentication, "ROLE_ADMIN");
 
         if (hasAdminRole) {
             return role;
         }
 
-        boolean hasMandorRole = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch("ROLE_MANDOR"::equals);
+        boolean hasMandorRole = hasRole(authentication, "ROLE_MANDOR");
 
         if (!hasMandorRole) {
             throw new ForbiddenException("Only ADMIN or MANDOR can access this resource");
@@ -50,5 +46,30 @@ public class UserListAccessPolicy {
         } catch (IllegalArgumentException ex) {
             throw new UnauthorizedException("Unauthorized");
         }
+    }
+
+    public void verifyMandorScope(Authentication authentication, UUID mandorId) {
+        if (authentication == null || authentication.getAuthorities() == null) {
+            throw new ForbiddenException();
+        }
+
+        if (hasRole(authentication, "ROLE_ADMIN")) {
+            return;
+        }
+
+        if (!hasRole(authentication, "ROLE_MANDOR")) {
+            throw new ForbiddenException("Only ADMIN or MANDOR can access this resource");
+        }
+
+        UUID authenticatedUserId = extractAuthenticatedUserId(authentication);
+        if (!authenticatedUserId.equals(mandorId)) {
+            throw new ForbiddenException("MANDOR can only access their own buruh assignments");
+        }
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(role::equals);
     }
 }
