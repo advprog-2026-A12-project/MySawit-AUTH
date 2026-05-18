@@ -108,6 +108,10 @@ class JwtAuthenticationFilterTest {
         MockHttpServletRequest googleReq = new MockHttpServletRequest();
         googleReq.setServletPath("/api/v1/auth/google");
         assertTrue(filter.shouldNotFilter(googleReq));
+
+        MockHttpServletRequest errorReq = new MockHttpServletRequest();
+        errorReq.setServletPath("/error");
+        assertTrue(filter.shouldNotFilter(errorReq));
     }
 
     @Test
