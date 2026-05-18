@@ -175,7 +175,8 @@ Dapat dilihat bahwa kode sudah aman, bycrpt memang memakan penggunaan CPU yang t
 </details>
 ---
 
-## Diagrams
+<details>
+    <summary><h2>Diagrams</h2></summary>
 
 Berikut adalah Component Diagram dan Code Diagrams untuk bagian autentikasi dan manajemen pengguna (MySawit-AUTH) 
 
@@ -200,3 +201,5 @@ Diagram-diagram di bawah ini menunjukkan struktur class/interface di level kode 
 
 **4. Code Diagram 4 — Deleted User Tracking Flow**: Menampilkan `DeletedUserController`, interface `UserService`, implementasinya `UserServiceImpl`, dan `UserRepository`. Diagram ini memvisualisasikan bagaimana Admin dapat melacak dan melihat histori dan profil dari akun-akun yang telah dinonaktifkan (di-*soft-delete*).
 ![Code Diagram 4](assets/codeDiagramDeleted.png)
+
+</details>
