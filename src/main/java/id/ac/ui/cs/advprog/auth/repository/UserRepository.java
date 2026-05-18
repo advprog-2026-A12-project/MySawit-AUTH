@@ -12,6 +12,7 @@ public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificat
     Optional<User> findByOauthProviderAndOauthProviderId(String oauthProvider, String oauthProviderId);
     boolean existsByEmail(String email);
     boolean existsByUsername(String username);
+    boolean existsByUsernameAndIdNot(String username, UUID id);
     boolean existsByMandorCertificationNumber(String mandorCertificationNumber);
     List<User> findAllByIsActiveTrueOrderByCreatedAtDesc();
 }

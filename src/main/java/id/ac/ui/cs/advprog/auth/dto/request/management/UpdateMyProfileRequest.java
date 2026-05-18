@@ -13,6 +13,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UpdateMyProfileRequest {
 
+    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
+    @Pattern(
+            regexp = "^[a-z0-9-]+$",
+            message = "Username can only contain lowercase letters, numbers, and hyphens"
+    )
+    private String username;
+
     @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
     private String name;
 

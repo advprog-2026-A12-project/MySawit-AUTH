@@ -6,6 +6,8 @@ import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentPag
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorAssignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorReassignmentResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.management.BuruhMandorUnassignmentResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.MandorBuruhPageResponseData;
+import id.ac.ui.cs.advprog.auth.dto.response.management.MandorBuruhSummaryResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
 import id.ac.ui.cs.advprog.auth.exception.UserNotFoundException;
@@ -82,6 +84,39 @@ public class AssignmentServiceImpl implements AssignmentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public MandorBuruhPageResponseData getBuruhsByMandor(UUID mandorId, int page, int size, String name) {
+        assignmentQueryValidator.validatePageParams(page, size);
+
+        User mandor = assignmentPolicy.getActiveUser(mandorId, "Mandor not found");
+        assignmentPolicy.requireRole(mandor, UserRole.MANDOR, "Mandor not found");
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "assignedAt"));
+        Specification<BuruhMandorAssignment> specification =
+                assignmentSpecificationBuilder.build(mandorId, name, null);
+        Page<BuruhMandorAssignment> assignmentsPage = assignmentRepository.findAll(specification, pageable);
+
+        List<MandorBuruhSummaryResponseData> content = assignmentsPage.getContent().stream()
+                .map(assignment -> MandorBuruhSummaryResponseData.builder()
+                        .id(assignment.getBuruh().getId())
+                        .name(assignment.getBuruh().getName())
+                        .email(assignment.getBuruh().getEmail())
+                        .assignedAt(assignment.getAssignedAt())
+                        .build())
+                .toList();
+
+        return MandorBuruhPageResponseData.builder()
+                .content(content)
+                .page(assignmentsPage.getNumber())
+                .size(assignmentsPage.getSize())
+                .totalElements(assignmentsPage.getTotalElements())
+                .totalPages(assignmentsPage.getTotalPages())
+                .first(assignmentsPage.isFirst())
+                .last(assignmentsPage.isLast())
+                .build();
+    }
+
+    @Override
     @Transactional
     public BuruhMandorReassignmentResponseData reassignBuruhToMandor(UUID buruhId, ReassignBuruhMandorRequest request) {
         BuruhMandorAssignment activeAssignment = assignmentRepository.findByBuruhIdAndIsActiveTrue(buruhId)
@@ -100,7 +135,7 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         activeAssignment.setActive(false);
         activeAssignment.setUnassignedAt(Instant.now());
-        assignmentRepository.save(activeAssignment);
+        assignmentRepository.saveAndFlush(activeAssignment);
 
         BuruhMandorAssignment newAssignment = BuruhMandorAssignment.builder()
                 .buruh(buruh)
