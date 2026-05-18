@@ -57,6 +57,7 @@ public class SecurityConfig {
                             "/api/v1/auth/register",
                             "/api/v1/auth/login",
                             "/api/v1/auth/google",
+                            "/error",
                             "/actuator/health",
                             "/actuator/prometheus",
                             "/h2-console/**"
