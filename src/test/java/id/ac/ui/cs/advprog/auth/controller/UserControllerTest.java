@@ -94,9 +94,9 @@ class UserControllerTest {
     void getUsersReturns403ForNonAdmin() throws Exception {
         mockMvc.perform(get("/api/v1/users")
                         .with(user("buruh").roles("BURUH")))
-                                .andExpect(status().isInternalServerError())
+                                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value("error"))
-                                .andExpect(jsonPath("$.message").value("Internal server error"));
+                                .andExpect(jsonPath("$.message").value("Access denied"));
     }
 
     @Test
@@ -194,9 +194,9 @@ class UserControllerTest {
         void getAllUsersForMandorReturns403ForNonMandor() throws Exception {
                 mockMvc.perform(get("/api/v1/users/mandor/all")
                                                 .with(user(UUID.randomUUID().toString()).roles("ADMIN")))
-                                .andExpect(status().isInternalServerError())
+                                .andExpect(status().isForbidden())
                                 .andExpect(jsonPath("$.status").value("error"))
-                                .andExpect(jsonPath("$.message").value("Internal server error"));
+                                .andExpect(jsonPath("$.message").value("Access denied"));
         }
 
         @Test
@@ -235,9 +235,9 @@ class UserControllerTest {
         void getUserByIdReturns403ForNonAdmin() throws Exception {
                 mockMvc.perform(get("/api/v1/users/{userId}", UUID.randomUUID())
                                                 .with(user("buruh").roles("BURUH")))
-                                .andExpect(status().isInternalServerError())
+                                .andExpect(status().isForbidden())
                                 .andExpect(jsonPath("$.status").value("error"))
-                                .andExpect(jsonPath("$.message").value("Internal server error"));
+                                .andExpect(jsonPath("$.message").value("Access denied"));
         }
 
         @Test
@@ -338,9 +338,9 @@ class UserControllerTest {
                     void deleteUserReturns403ForNonAdmin() throws Exception {
                         mockMvc.perform(delete("/api/v1/users/{userId}", UUID.randomUUID())
                                         .with(user(UUID.randomUUID().toString()).roles("BURUH")))
-                                        .andExpect(status().isInternalServerError())
+                                        .andExpect(status().isForbidden())
                                 .andExpect(jsonPath("$.status").value("error"))
-                                        .andExpect(jsonPath("$.message").value("Internal server error"));
+                                        .andExpect(jsonPath("$.message").value("Access denied"));
                     }
 
                     @Test
