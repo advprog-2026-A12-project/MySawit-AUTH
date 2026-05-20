@@ -63,7 +63,6 @@ Justifikasi kenapa metrik tersebut harus dimonitor:
 
 </details>
 
-
 <details>
     <summary><h2>Profilling</h2></summary>
 
@@ -173,7 +172,6 @@ Dapat dilihat bahwa kode sudah aman, bycrpt memang memakan penggunaan CPU yang t
 
 
 </details>
----
 
 <details>
     <summary><h2>Diagrams</h2></summary>
