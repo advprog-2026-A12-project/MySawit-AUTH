@@ -94,7 +94,11 @@ public class RestClientPaymentWalletClient implements PaymentWalletClient {
         if (value == null || value.isBlank()) {
             return value;
         }
-        return value.replaceAll("/+$", "");
+        int endIndex = value.length();
+        while (endIndex > 0 && value.charAt(endIndex - 1) == '/') {
+            endIndex--;
+        }
+        return value.substring(0, endIndex);
     }
 
     private static String ensureLeadingSlash(String value) {
