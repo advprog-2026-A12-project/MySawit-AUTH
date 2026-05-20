@@ -18,6 +18,7 @@ import id.ac.ui.cs.advprog.auth.service.authprovider.PasswordAuthRequest;
 import id.ac.ui.cs.advprog.auth.service.utils.AuthTokenIssuer;
 import id.ac.ui.cs.advprog.auth.service.utils.IssuedTokens;
 import id.ac.ui.cs.advprog.auth.service.utils.UsernameGenerator;
+import id.ac.ui.cs.advprog.auth.service.wallet.WalletProvisioningService;
 import id.ac.ui.cs.advprog.auth.validation.RegistrationValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,6 +36,7 @@ public class AuthServiceImpl implements AuthService {
     private final AuthTokenIssuer authTokenIssuer;
     private final AuthProviderFactory authProviderFactory;
     private final AuthResponseMapper authResponseMapper;
+    private final WalletProvisioningService walletProvisioningService;
 
     @Override
     @Transactional
@@ -53,6 +55,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         User saved = userRepository.save(user);
+        walletProvisioningService.provisionWallet(saved.getId());
         return authResponseMapper.toRegisterResponse(saved);
     }
 
