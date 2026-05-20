@@ -95,9 +95,9 @@ class AssignmentControllerTest {
     void getAssignmentsReturns403ForNonAdmin() throws Exception {
         mockMvc.perform(get("/api/v1/assignments/buruh-mandor")
                         .with(user("buruh").roles("BURUH")))
-                                .andExpect(status().isInternalServerError())
+                                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value("error"))
-                                .andExpect(jsonPath("$.message").value("Internal server error"));
+                                .andExpect(jsonPath("$.message").value("Access denied"));
     }
 
         @Test
@@ -165,9 +165,9 @@ class AssignmentControllerTest {
                         .with(user("buruh").roles("BURUH"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isInternalServerError())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value("error"))
-                .andExpect(jsonPath("$.message").value("Internal server error"));
+                .andExpect(jsonPath("$.message").value("Access denied"));
     }
 
     @Test
@@ -232,9 +232,9 @@ class AssignmentControllerTest {
                         .with(user("buruh").roles("BURUH"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isInternalServerError())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value("error"))
-                .andExpect(jsonPath("$.message").value("Internal server error"));
+                .andExpect(jsonPath("$.message").value("Access denied"));
     }
 
     @Test
@@ -281,9 +281,9 @@ class AssignmentControllerTest {
     void unassignBuruhFromMandorReturns403ForNonAdmin() throws Exception {
         mockMvc.perform(delete("/api/v1/assignments/buruh-mandor/{buruhId}", UUID.randomUUID())
                         .with(user("buruh").roles("BURUH")))
-                                .andExpect(status().isInternalServerError())
+                                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value("error"))
-                                .andExpect(jsonPath("$.message").value("Internal server error"));
+                                .andExpect(jsonPath("$.message").value("Access denied"));
     }
 
     @Test

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,6 +17,7 @@ import id.ac.ui.cs.advprog.auth.dto.response.auth.LoginResponseData;
 import id.ac.ui.cs.advprog.auth.dto.response.auth.RegisterResponseData;
 import id.ac.ui.cs.advprog.auth.enums.UserRole;
 import id.ac.ui.cs.advprog.auth.exception.DuplicateUserException;
+import id.ac.ui.cs.advprog.auth.exception.ExternalServiceException;
 import id.ac.ui.cs.advprog.auth.exception.InvalidUserRequestException;
 import id.ac.ui.cs.advprog.auth.exception.UnauthorizedException;
 import id.ac.ui.cs.advprog.auth.exception.UnprocessableEntityException;
@@ -31,6 +33,7 @@ import id.ac.ui.cs.advprog.auth.service.authprovider.GoogleAuthProvider;
 import id.ac.ui.cs.advprog.auth.service.authprovider.PasswordAuthProvider;
 import id.ac.ui.cs.advprog.auth.service.oauth.OAuthClient;
 import id.ac.ui.cs.advprog.auth.validation.RegistrationValidator;
+import id.ac.ui.cs.advprog.auth.service.wallet.WalletProvisioningService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -51,6 +54,7 @@ class AuthServiceImplTest {
         @Mock private JwtService jwtService;
         @Mock private OAuthClient oauthClient;
         @Mock private PasswordEncoder passwordEncoder;
+        @Mock private WalletProvisioningService walletProvisioningService;
 
         private AuthServiceImpl authService;
 
@@ -77,7 +81,8 @@ class AuthServiceImplTest {
                 usernameGenerator,
                 authTokenIssuer,
                 authProviderFactory,
-                authResponseMapper
+                authResponseMapper,
+                walletProvisioningService
         );
 
         sampleUser = User.builder()
@@ -126,6 +131,7 @@ class AuthServiceImplTest {
             assertEquals("BURUH", result.getRole());
             assertNotNull(result.getCreatedAt());
             verify(userRepository).save(any(User.class));
+            verify(walletProvisioningService).provisionWallet(result.getId());
         }
 
         @Test
@@ -154,6 +160,33 @@ class AuthServiceImplTest {
 
             assertEquals("MANDOR", result.getRole());
             verify(userRepository).existsByMandorCertificationNumber("CERT-001");
+            verify(walletProvisioningService).provisionWallet(result.getId());
+        }
+
+        @Test
+        void registerThrowsWhenWalletProvisioningFails() {
+            RegisterRequest request = RegisterRequest.builder()
+                    .name("Ahmad Buruh")
+                    .email("ahmad@example.com")
+                    .password("SecureP@ss123")
+                    .role("BURUH")
+                    .build();
+
+            when(userRepository.existsByEmail(anyString())).thenReturn(false);
+            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(passwordEncoder.encode(anyString())).thenReturn("$2a$12$encoded");
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+                User u = inv.getArgument(0);
+                u.setId(UUID.randomUUID());
+                u.setCreatedAt(Instant.now());
+                u.setUpdatedAt(Instant.now());
+                return u;
+            });
+            doThrow(new ExternalServiceException("Wallet service is unavailable"))
+                    .when(walletProvisioningService)
+                    .provisionWallet(any(UUID.class));
+
+            assertThrows(ExternalServiceException.class, () -> authService.register(request));
         }
 
         @Test

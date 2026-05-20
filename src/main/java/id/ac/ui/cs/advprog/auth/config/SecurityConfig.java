@@ -7,6 +7,7 @@ import id.ac.ui.cs.advprog.auth.service.JwtService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -29,6 +30,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    @Value("${app.security.bcrypt-strength:10}")
+    private int bcryptStrength;
 
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(JwtService jwtService) {
@@ -54,6 +57,7 @@ public class SecurityConfig {
                             "/api/v1/auth/register",
                             "/api/v1/auth/login",
                             "/api/v1/auth/google",
+                            "/error",
                             "/actuator/health",
                             "/actuator/prometheus",
                             "/h2-console/**"
@@ -90,7 +94,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+        return new BCryptPasswordEncoder(bcryptStrength);
     }
 
     @Bean
@@ -106,3 +110,5 @@ public class SecurityConfig {
         return source;
     }
 }
+
+

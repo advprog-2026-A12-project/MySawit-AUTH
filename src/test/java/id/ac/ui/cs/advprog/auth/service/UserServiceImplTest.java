@@ -655,7 +655,7 @@ class UserServiceImplTest {
         InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class,
                 () -> userService.updateMyProfile(userId, request));
 
-        assertEquals("At least one of name or password must be provided", ex.getMessage());
+        assertEquals("At least one of username, name or password must be provided", ex.getMessage());
     }
 
     @Test
@@ -679,7 +679,7 @@ class UserServiceImplTest {
         InvalidUserRequestException ex = assertThrows(InvalidUserRequestException.class,
                 () -> userService.updateMyProfile(userId, request));
 
-        assertEquals("At least one of name or password must be provided", ex.getMessage());
+        assertEquals("At least one of username, name or password must be provided", ex.getMessage());
         verify(passwordEncoder, never()).encode(anyString());
     }
 

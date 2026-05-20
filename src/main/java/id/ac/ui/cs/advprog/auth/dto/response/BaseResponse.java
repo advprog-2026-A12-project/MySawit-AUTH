@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.auth.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import java.time.Instant;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -17,6 +18,7 @@ public class BaseResponse<T> {
 
     private String status;
     private String message;
+    @JsonInclude(Include.ALWAYS)
     private T data;
     private List<FieldErrorDto> errors;
     private Instant timestamp;
