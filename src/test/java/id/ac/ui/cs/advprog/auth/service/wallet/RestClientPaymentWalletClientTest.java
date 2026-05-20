@@ -22,6 +22,7 @@ class RestClientPaymentWalletClientTest {
 
     private static final String BASE_URL = "http://payment-service:8003";
     private static final String API_KEY = "internal-key";
+    private static final String CREATE_WALLET_PATH = "/api/v1/internal/wallets";
 
     private MockRestServiceServer server;
     private RestClientPaymentWalletClient client;
@@ -30,7 +31,7 @@ class RestClientPaymentWalletClientTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new RestClientPaymentWalletClient(builder.build(), BASE_URL + "/", API_KEY);
+        client = new RestClientPaymentWalletClient(builder.build(), BASE_URL + "/", API_KEY, CREATE_WALLET_PATH);
     }
 
     @Test
@@ -55,10 +56,12 @@ class RestClientPaymentWalletClientTest {
         RestClientPaymentWalletClient misconfigured = new RestClientPaymentWalletClient(
                 RestClient.create(),
                 "",
-                API_KEY
+                API_KEY,
+                CREATE_WALLET_PATH
         );
+        UUID userId = UUID.randomUUID();
 
-        assertThrows(ExternalServiceException.class, () -> misconfigured.createWallet(UUID.randomUUID()));
+        assertThrows(ExternalServiceException.class, () -> misconfigured.createWallet(userId));
     }
 
     @Test
@@ -66,10 +69,25 @@ class RestClientPaymentWalletClientTest {
         RestClientPaymentWalletClient misconfigured = new RestClientPaymentWalletClient(
                 RestClient.create(),
                 BASE_URL,
+                " ",
+                CREATE_WALLET_PATH
+        );
+        UUID userId = UUID.randomUUID();
+
+        assertThrows(ExternalServiceException.class, () -> misconfigured.createWallet(userId));
+    }
+
+    @Test
+    void createWalletThrowsWhenPathMissing() {
+        RestClientPaymentWalletClient misconfigured = new RestClientPaymentWalletClient(
+                RestClient.create(),
+                BASE_URL,
+                API_KEY,
                 " "
         );
+        UUID userId = UUID.randomUUID();
 
-        assertThrows(ExternalServiceException.class, () -> misconfigured.createWallet(UUID.randomUUID()));
+        assertThrows(ExternalServiceException.class, () -> misconfigured.createWallet(userId));
     }
 
     @Test

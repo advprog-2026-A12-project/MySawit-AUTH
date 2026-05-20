@@ -14,28 +14,31 @@ import org.springframework.web.client.RestClientResponseException;
 @Service
 public class RestClientPaymentWalletClient implements PaymentWalletClient {
 
-    private static final String CREATE_WALLET_PATH = "/api/v1/internal/wallets";
     private static final String INTERNAL_API_KEY_HEADER = "X-Internal-Api-Key";
     private static final String SUCCESS_STATUS = "success";
 
     private final RestClient restClient;
     private final String paymentServiceBaseUrl;
     private final String internalApiKey;
+    private final String createWalletPath;
 
     @Autowired
     public RestClientPaymentWalletClient(
             @Value("${payment.service.base-url:}") String paymentServiceBaseUrl,
-            @Value("${payment.internal-api-key:}") String internalApiKey) {
-        this(RestClient.create(), paymentServiceBaseUrl, internalApiKey);
+            @Value("${payment.internal-api-key:}") String internalApiKey,
+            @Value("${payment.wallet.create-path:/api/v1/internal/wallets}") String createWalletPath) {
+        this(RestClient.create(), paymentServiceBaseUrl, internalApiKey, createWalletPath);
     }
 
     RestClientPaymentWalletClient(
             RestClient restClient,
             String paymentServiceBaseUrl,
-            String internalApiKey) {
+            String internalApiKey,
+            String createWalletPath) {
         this.restClient = restClient;
         this.paymentServiceBaseUrl = trimTrailingSlash(paymentServiceBaseUrl);
         this.internalApiKey = internalApiKey;
+        this.createWalletPath = ensureLeadingSlash(createWalletPath);
     }
 
     @Override
@@ -45,7 +48,7 @@ public class RestClientPaymentWalletClient implements PaymentWalletClient {
 
         try {
             CreateWalletResponse response = restClient.post()
-                    .uri(paymentServiceBaseUrl + CREATE_WALLET_PATH)
+                    .uri(paymentServiceBaseUrl + createWalletPath)
                     .header(INTERNAL_API_KEY_HEADER, internalApiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(new CreateWalletRequest(userId))
@@ -73,6 +76,9 @@ public class RestClientPaymentWalletClient implements PaymentWalletClient {
         if (internalApiKey == null || internalApiKey.isBlank()) {
             throw new ExternalServiceException("Payment internal API key is not configured");
         }
+        if (createWalletPath == null || createWalletPath.isBlank()) {
+            throw new ExternalServiceException("Payment wallet creation path is not configured");
+        }
     }
 
     private void validateResponse(CreateWalletResponse response) {
@@ -89,6 +95,13 @@ public class RestClientPaymentWalletClient implements PaymentWalletClient {
             return value;
         }
         return value.replaceAll("/+$", "");
+    }
+
+    private static String ensureLeadingSlash(String value) {
+        if (value == null || value.isBlank() || value.startsWith("/")) {
+            return value;
+        }
+        return "/" + value;
     }
 
     private record CreateWalletRequest(UUID userId) {
