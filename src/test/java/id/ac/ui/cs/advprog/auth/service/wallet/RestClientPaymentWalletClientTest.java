@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.auth.service.wallet;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -25,13 +26,15 @@ class RestClientPaymentWalletClientTest {
     private static final String CREATE_WALLET_PATH = "/api/v1/internal/wallets";
 
     private MockRestServiceServer server;
+    private RestClient restClient;
     private RestClientPaymentWalletClient client;
 
     @BeforeEach
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new RestClientPaymentWalletClient(builder.build(), BASE_URL + "/", API_KEY, CREATE_WALLET_PATH);
+        restClient = builder.build();
+        client = new RestClientPaymentWalletClient(restClient, BASE_URL + "/", API_KEY, CREATE_WALLET_PATH);
     }
 
     @Test
@@ -52,10 +55,74 @@ class RestClientPaymentWalletClientTest {
     }
 
     @Test
+    void constructorAcceptsConfiguredProperties() {
+        RestClientPaymentWalletClient configuredClient = new RestClientPaymentWalletClient(
+                BASE_URL,
+                API_KEY,
+                CREATE_WALLET_PATH
+        );
+
+        assertNotNull(configuredClient);
+    }
+
+    @Test
+    void createWalletNormalizesBaseUrlAndPathSlashes() {
+        UUID userId = UUID.randomUUID();
+        UUID walletId = UUID.randomUUID();
+        RestClientPaymentWalletClient clientWithSlashlessPath = new RestClientPaymentWalletClient(
+                restClient,
+                BASE_URL + "///",
+                API_KEY,
+                "api/v1/internal/wallets"
+        );
+
+        server.expect(requestTo(BASE_URL + "/api/v1/internal/wallets"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess(successResponse(walletId), MediaType.APPLICATION_JSON));
+
+        clientWithSlashlessPath.createWallet(userId);
+
+        server.verify();
+    }
+
+    @Test
+    void createWalletWorksWhenBaseUrlHasNoTrailingSlash() {
+        UUID userId = UUID.randomUUID();
+        UUID walletId = UUID.randomUUID();
+        RestClientPaymentWalletClient clientWithoutTrailingSlash = new RestClientPaymentWalletClient(
+                restClient,
+                BASE_URL,
+                API_KEY,
+                CREATE_WALLET_PATH
+        );
+
+        server.expect(requestTo(BASE_URL + "/api/v1/internal/wallets"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess(successResponse(walletId), MediaType.APPLICATION_JSON));
+
+        clientWithoutTrailingSlash.createWallet(userId);
+
+        server.verify();
+    }
+
+    @Test
     void createWalletThrowsWhenBaseUrlMissing() {
         RestClientPaymentWalletClient misconfigured = new RestClientPaymentWalletClient(
                 RestClient.create(),
                 "",
+                API_KEY,
+                CREATE_WALLET_PATH
+        );
+        UUID userId = UUID.randomUUID();
+
+        assertThrows(ExternalServiceException.class, () -> misconfigured.createWallet(userId));
+    }
+
+    @Test
+    void createWalletThrowsWhenBaseUrlNull() {
+        RestClientPaymentWalletClient misconfigured = new RestClientPaymentWalletClient(
+                RestClient.create(),
+                null,
                 API_KEY,
                 CREATE_WALLET_PATH
         );
@@ -78,12 +145,38 @@ class RestClientPaymentWalletClientTest {
     }
 
     @Test
+    void createWalletThrowsWhenApiKeyNull() {
+        RestClientPaymentWalletClient misconfigured = new RestClientPaymentWalletClient(
+                RestClient.create(),
+                BASE_URL,
+                null,
+                CREATE_WALLET_PATH
+        );
+        UUID userId = UUID.randomUUID();
+
+        assertThrows(ExternalServiceException.class, () -> misconfigured.createWallet(userId));
+    }
+
+    @Test
     void createWalletThrowsWhenPathMissing() {
         RestClientPaymentWalletClient misconfigured = new RestClientPaymentWalletClient(
                 RestClient.create(),
                 BASE_URL,
                 API_KEY,
                 " "
+        );
+        UUID userId = UUID.randomUUID();
+
+        assertThrows(ExternalServiceException.class, () -> misconfigured.createWallet(userId));
+    }
+
+    @Test
+    void createWalletThrowsWhenPathNull() {
+        RestClientPaymentWalletClient misconfigured = new RestClientPaymentWalletClient(
+                RestClient.create(),
+                BASE_URL,
+                API_KEY,
+                null
         );
         UUID userId = UUID.randomUUID();
 
@@ -108,12 +201,62 @@ class RestClientPaymentWalletClientTest {
     }
 
     @Test
-    void createWalletThrowsWhenResponseInvalid() {
+    void createWalletThrowsWhenPaymentResponseMalformed() {
         UUID userId = UUID.randomUUID();
 
         server.expect(requestTo(BASE_URL + "/api/v1/internal/wallets"))
                 .andExpect(method(HttpMethod.POST))
-                .andRespond(withSuccess("{\"status\":\"error\",\"data\":null}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("not-json", MediaType.APPLICATION_JSON));
+
+        assertThrows(ExternalServiceException.class, () -> client.createWallet(userId));
+        server.verify();
+    }
+
+    @Test
+    void createWalletThrowsWhenResponseStatusInvalid() {
+        UUID userId = UUID.randomUUID();
+
+        server.expect(requestTo(BASE_URL + "/api/v1/internal/wallets"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"status\":\"error\",\"data\":{\"walletId\":\""
+                        + UUID.randomUUID()
+                        + "\"}}", MediaType.APPLICATION_JSON));
+
+        assertThrows(ExternalServiceException.class, () -> client.createWallet(userId));
+        server.verify();
+    }
+
+    @Test
+    void createWalletThrowsWhenResponseDataMissing() {
+        UUID userId = UUID.randomUUID();
+
+        server.expect(requestTo(BASE_URL + "/api/v1/internal/wallets"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"status\":\"success\",\"data\":null}", MediaType.APPLICATION_JSON));
+
+        assertThrows(ExternalServiceException.class, () -> client.createWallet(userId));
+        server.verify();
+    }
+
+    @Test
+    void createWalletThrowsWhenResponseWalletIdMissing() {
+        UUID userId = UUID.randomUUID();
+
+        server.expect(requestTo(BASE_URL + "/api/v1/internal/wallets"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"status\":\"success\",\"data\":{}}", MediaType.APPLICATION_JSON));
+
+        assertThrows(ExternalServiceException.class, () -> client.createWallet(userId));
+        server.verify();
+    }
+
+    @Test
+    void createWalletThrowsWhenResponseBodyMissing() {
+        UUID userId = UUID.randomUUID();
+
+        server.expect(requestTo(BASE_URL + "/api/v1/internal/wallets"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("", MediaType.APPLICATION_JSON));
 
         assertThrows(ExternalServiceException.class, () -> client.createWallet(userId));
         server.verify();
