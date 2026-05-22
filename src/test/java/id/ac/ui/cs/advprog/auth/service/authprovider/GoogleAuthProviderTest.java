@@ -16,6 +16,8 @@ import id.ac.ui.cs.advprog.auth.repository.UserRepository;
 import id.ac.ui.cs.advprog.auth.service.oauth.OAuthClient;
 import id.ac.ui.cs.advprog.auth.service.utils.GoogleUserInfo;
 import id.ac.ui.cs.advprog.auth.service.utils.UsernameGenerator;
+import id.ac.ui.cs.advprog.auth.service.wallet.WalletProvisioningService;
+import java.util.UUID;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,12 +35,13 @@ class GoogleAuthProviderTest {
     @Mock private UserRepository userRepository;
     @Mock private OAuthClient oauthClient;
     @Mock private UsernameGenerator usernameGenerator;
+    @Mock private WalletProvisioningService walletProvisioningService;
 
     private GoogleAuthProvider provider;
 
     @BeforeEach
     void setUp() {
-        provider = new GoogleAuthProvider(userRepository, oauthClient, usernameGenerator);
+        provider = new GoogleAuthProvider(userRepository, oauthClient, usernameGenerator, walletProvisioningService);
     }
 
     @Test
@@ -54,7 +57,7 @@ class GoogleAuthProviderTest {
         when(usernameGenerator.generateUniqueUsername(anyString())).thenReturn("gen-user");
 
         ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
-        when(userRepository.save(cap.capture())).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.save(cap.capture())).thenAnswer(inv -> savedWithId(inv.getArgument(0)));
 
         User saved = provider.authenticate(req);
 
@@ -64,6 +67,7 @@ class GoogleAuthProviderTest {
         assertEquals("u@example.com", saved.getEmail());
         assertEquals(true, saved.isActive());
         assertEquals("BURUH", saved.getRole().name());
+        verify(walletProvisioningService).provisionWallet(saved.getId());
     }
 
     @Test
@@ -79,12 +83,13 @@ class GoogleAuthProviderTest {
         when(usernameGenerator.generateUniqueUsername(anyString())).thenReturn("mandor-user");
 
         ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
-        when(userRepository.save(cap.capture())).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.save(cap.capture())).thenAnswer(inv -> savedWithId(inv.getArgument(0)));
 
-        provider.authenticate(req);
+        User saved = provider.authenticate(req);
 
         assertEquals("MANDOR", cap.getValue().getRole().name());
         assertEquals("CERT-1", cap.getValue().getMandorCertificationNumber());
+        verify(walletProvisioningService).provisionWallet(saved.getId());
     }
 
     @Test
@@ -135,6 +140,7 @@ class GoogleAuthProviderTest {
 
         assertEquals("GOOGLE", u.getOauthProvider());
         assertEquals("sub-5", u.getOauthProviderId());
+        verify(walletProvisioningService, never()).provisionWallet(any(UUID.class));
     }
 
     @Test
@@ -172,6 +178,7 @@ class GoogleAuthProviderTest {
         User u = provider.authenticate(req);
 
         verify(userRepository, never()).save(any(User.class));
+        verify(walletProvisioningService, never()).provisionWallet(any(UUID.class));
         assertEquals(existing, u);
     }
 
@@ -218,12 +225,18 @@ class GoogleAuthProviderTest {
         when(usernameGenerator.generateUniqueUsername("no-name@example.com")).thenReturn("noname-user");
 
         ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
-        when(userRepository.save(cap.capture())).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.save(cap.capture())).thenAnswer(inv -> savedWithId(inv.getArgument(0)));
 
         User saved = provider.authenticate(req);
 
         assertEquals("no-name@example.com", cap.getValue().getName());
         assertEquals("noname-user", cap.getValue().getUsername());
         assertEquals("BURUH", cap.getValue().getRole().name());
+        verify(walletProvisioningService).provisionWallet(saved.getId());
+    }
+
+    private User savedWithId(User user) {
+        user.setId(UUID.randomUUID());
+        return user;
     }
 }
