@@ -1,0 +1,107 @@
+name: Rollback Traffic
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_color:
+        description: "Target live color after rollback"
+        type: choice
+        required: true
+        default: blue
+        options:
+          - blue
+          - green
+      run_smoke_test:
+        description: "Run smoke test after switch"
+        type: choice
+        required: true
+        default: "yes"
+        options:
+          - "yes"
+          - "no"
+      expected_status:
+        description: "Expected HTTP status for smoke test"
+        type: string
+        required: true
+        default: "401"
+
+permissions:
+  contents: read
+
+jobs:
+  rollback_traffic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate rollback configuration
+        run: |
+          test -n "${{ secrets.EC2_BLUE_HOST }}" || (echo "Missing secret EC2_BLUE_HOST" && exit 1)
+          test -n "${{ secrets.EC2_USERNAME }}" || (echo "Missing secret EC2_USERNAME" && exit 1)
+          test -n "${{ secrets.EC2_SSH_PRIVATE_KEY }}" || (echo "Missing secret EC2_SSH_PRIVATE_KEY" && exit 1)
+          test -n "${{ vars.AWS_REGION }}" || (echo "Missing variable AWS_REGION" && exit 1)
+          test -n "${{ vars.ALB_AUTH_RULE_ARN }}" || (echo "Missing variable ALB_AUTH_RULE_ARN" && exit 1)
+          test -n "${{ vars.TG_AUTH_BLUE_ARN }}" || (echo "Missing variable TG_AUTH_BLUE_ARN" && exit 1)
+          test -n "${{ vars.TG_AUTH_GREEN_ARN }}" || (echo "Missing variable TG_AUTH_GREEN_ARN" && exit 1)
+
+      - name: Prepare SSH key
+        env:
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$EC2_SSH_PRIVATE_KEY" > /tmp/ec2_ssh_key
+          chmod 600 /tmp/ec2_ssh_key
+
+      - name: Roll back ALB traffic
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
+          CONTROL_HOST: ${{ secrets.EC2_BLUE_HOST }}
+          ALB_AUTH_RULE_ARN: ${{ vars.ALB_AUTH_RULE_ARN }}
+          TG_AUTH_BLUE_ARN: ${{ vars.TG_AUTH_BLUE_ARN }}
+          TG_AUTH_GREEN_ARN: ${{ vars.TG_AUTH_GREEN_ARN }}
+          TARGET_COLOR: ${{ inputs.target_color }}
+        run: |
+          set -euo pipefail
+          if [ "$TARGET_COLOR" = "blue" ]; then
+            BLUE_WEIGHT=100
+            GREEN_WEIGHT=0
+          else
+            BLUE_WEIGHT=0
+            GREEN_WEIGHT=100
+          fi
+
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+          ssh $SSH_OPTS -i /tmp/ec2_ssh_key "$EC2_USERNAME@$CONTROL_HOST" \
+            "AWS_REGION='$AWS_REGION' ALB_AUTH_RULE_ARN='$ALB_AUTH_RULE_ARN' TG_AUTH_BLUE_ARN='$TG_AUTH_BLUE_ARN' TG_AUTH_GREEN_ARN='$TG_AUTH_GREEN_ARN' BLUE_WEIGHT='$BLUE_WEIGHT' GREEN_WEIGHT='$GREEN_WEIGHT' bash -se" <<'EOF'
+          cat > /tmp/alb-actions-rollback.json <<JSON
+          [{
+            "Type":"forward",
+            "ForwardConfig":{
+              "TargetGroups":[
+                {"TargetGroupArn":"${TG_AUTH_BLUE_ARN}","Weight":${BLUE_WEIGHT}},
+                {"TargetGroupArn":"${TG_AUTH_GREEN_ARN}","Weight":${GREEN_WEIGHT}}
+              ]
+            }
+          }]
+          JSON
+
+          aws elbv2 modify-rule \
+            --region "$AWS_REGION" \
+            --rule-arn "$ALB_AUTH_RULE_ARN" \
+            --actions file:///tmp/alb-actions-rollback.json
+          EOF
+
+      - name: Smoke test endpoint
+        if: ${{ inputs.run_smoke_test == 'yes' }}
+        env:
+          SMOKE_URL: ${{ vars.PRODUCTION_SMOKE_URL || 'https://api.sushiikan.me/api/v1/users/me' }}
+          EXPECTED_STATUS: ${{ inputs.expected_status }}
+        run: |
+          set -euo pipefail
+          status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$SMOKE_URL")"
+          echo "Smoke URL: $SMOKE_URL"
+          echo "HTTP status: $status"
+          if [ "$status" != "$EXPECTED_STATUS" ]; then
+            echo "Unexpected smoke test status: expected $EXPECTED_STATUS, got $status"
+            exit 1
+          fi
+
