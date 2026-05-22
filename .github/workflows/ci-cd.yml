@@ -88,6 +88,17 @@ jobs:
           test -n "${{ secrets.DOCKERHUB_USERNAME }}" || (echo "Missing secret DOCKERHUB_USERNAME" && exit 1)
           test -n "${{ secrets.DOCKERHUB_TOKEN }}" || (echo "Missing secret DOCKERHUB_TOKEN" && exit 1)
 
+      - name: Validate blue/green deployment configuration
+        run: |
+          test -n "${{ secrets.EC2_BLUE_HOST }}" || (echo "Missing secret EC2_BLUE_HOST" && exit 1)
+          test -n "${{ secrets.EC2_GREEN_HOST }}" || (echo "Missing secret EC2_GREEN_HOST" && exit 1)
+          test -n "${{ secrets.EC2_USERNAME }}" || (echo "Missing secret EC2_USERNAME" && exit 1)
+          test -n "${{ secrets.EC2_SSH_PRIVATE_KEY }}" || (echo "Missing secret EC2_SSH_PRIVATE_KEY" && exit 1)
+          test -n "${{ vars.AWS_REGION }}" || (echo "Missing variable AWS_REGION" && exit 1)
+          test -n "${{ vars.ALB_AUTH_RULE_ARN }}" || (echo "Missing variable ALB_AUTH_RULE_ARN" && exit 1)
+          test -n "${{ vars.TG_AUTH_BLUE_ARN }}" || (echo "Missing variable TG_AUTH_BLUE_ARN" && exit 1)
+          test -n "${{ vars.TG_AUTH_GREEN_ARN }}" || (echo "Missing variable TG_AUTH_GREEN_ARN" && exit 1)
+
       - name: Checkout
         uses: actions/checkout@v5
 
@@ -111,13 +122,80 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Validate EC2 deployment configuration
+      - name: Prepare SSH key for control-plane commands
+        env:
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
         run: |
-          test -n "${{ secrets.EC2_HOST }}" || (echo "Missing secret EC2_HOST" && exit 1)
-          test -n "${{ secrets.EC2_USERNAME }}" || (echo "Missing secret EC2_USERNAME" && exit 1)
-          test -n "${{ secrets.EC2_SSH_PRIVATE_KEY }}" || (echo "Missing secret EC2_SSH_PRIVATE_KEY" && exit 1)
+          set -euo pipefail
+          printf '%s\n' "$EC2_SSH_PRIVATE_KEY" > /tmp/ec2_ssh_key
+          chmod 600 /tmp/ec2_ssh_key
 
-      - name: Deploy container to EC2 via SSH
+      - name: Plan blue/green target
+        id: route_plan
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          ALB_AUTH_RULE_ARN: ${{ vars.ALB_AUTH_RULE_ARN }}
+          TG_AUTH_BLUE_ARN: ${{ vars.TG_AUTH_BLUE_ARN }}
+          TG_AUTH_GREEN_ARN: ${{ vars.TG_AUTH_GREEN_ARN }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
+          CONTROL_HOST: ${{ secrets.EC2_BLUE_HOST }}
+          EC2_BLUE_HOST: ${{ secrets.EC2_BLUE_HOST }}
+          EC2_GREEN_HOST: ${{ secrets.EC2_GREEN_HOST }}
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+          ssh $SSH_OPTS -i /tmp/ec2_ssh_key "$EC2_USERNAME@$CONTROL_HOST" \
+            "aws elbv2 describe-rules --region '$AWS_REGION' --rule-arns '$ALB_AUTH_RULE_ARN' --output json" \
+            > /tmp/alb-rule.json
+          python - <<'PY'
+          import json
+          import os
+          import sys
+
+          with open("/tmp/alb-rule.json", "r", encoding="utf-8") as fh:
+              payload = json.load(fh)
+
+          rule = payload["Rules"][0]
+          forward_actions = [action for action in rule.get("Actions", []) if action.get("Type") == "forward"]
+          if not forward_actions:
+              print("No forward action found in ALB rule", file=sys.stderr)
+              sys.exit(1)
+
+          target_groups = forward_actions[0].get("ForwardConfig", {}).get("TargetGroups", [])
+          weights = {tg.get("TargetGroupArn"): int(tg.get("Weight", 0)) for tg in target_groups}
+
+          blue_arn = os.environ["TG_AUTH_BLUE_ARN"]
+          green_arn = os.environ["TG_AUTH_GREEN_ARN"]
+
+          if blue_arn not in weights or green_arn not in weights:
+              print("ALB rule must include both blue and green target groups", file=sys.stderr)
+              sys.exit(1)
+
+          blue_weight = weights[blue_arn]
+          green_weight = weights[green_arn]
+
+          if blue_weight > green_weight:
+              current_live = "blue"
+              deploy_target = "green"
+              target_host = os.environ["EC2_GREEN_HOST"]
+          elif green_weight > blue_weight:
+              current_live = "green"
+              deploy_target = "blue"
+              target_host = os.environ["EC2_BLUE_HOST"]
+          else:
+              print("Cannot infer live color when blue and green weights are equal", file=sys.stderr)
+              sys.exit(1)
+
+          out = os.environ["GITHUB_OUTPUT"]
+          with open(out, "a", encoding="utf-8") as fh:
+              fh.write(f"current_live={current_live}\n")
+              fh.write(f"deploy_target={deploy_target}\n")
+              fh.write(f"target_host={target_host}\n")
+              fh.write(f"blue_weight={blue_weight}\n")
+              fh.write(f"green_weight={green_weight}\n")
+          PY
+
+      - name: Deploy container to target color via SSH
         uses: appleboy/ssh-action@v1.2.5
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -145,7 +223,7 @@ jobs:
           POSTGRES_USER: ${{ vars.POSTGRES_USER || '' }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || '' }}
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ steps.route_plan.outputs.target_host }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           port: ${{ secrets.EC2_PORT || 22 }}
@@ -211,3 +289,132 @@ jobs:
             fi
 
             docker image prune -f
+
+      - name: Switch 100% traffic to deployed color
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
+          CONTROL_HOST: ${{ secrets.EC2_BLUE_HOST }}
+          ALB_AUTH_RULE_ARN: ${{ vars.ALB_AUTH_RULE_ARN }}
+          TG_AUTH_BLUE_ARN: ${{ vars.TG_AUTH_BLUE_ARN }}
+          TG_AUTH_GREEN_ARN: ${{ vars.TG_AUTH_GREEN_ARN }}
+          DEPLOY_TARGET: ${{ steps.route_plan.outputs.deploy_target }}
+        run: |
+          set -euo pipefail
+          if [ "$DEPLOY_TARGET" = "blue" ]; then
+            TARGET_TG_ARN="$TG_AUTH_BLUE_ARN"
+          else
+            TARGET_TG_ARN="$TG_AUTH_GREEN_ARN"
+          fi
+
+          # Wait until every registered target in destination TG is healthy.
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+          ssh $SSH_OPTS -i /tmp/ec2_ssh_key "$EC2_USERNAME@$CONTROL_HOST" \
+            "AWS_REGION='$AWS_REGION' TARGET_TG_ARN='$TARGET_TG_ARN' bash -se" <<'EOF'
+          set -euo pipefail
+          timeout_secs=300
+          sleep_secs=10
+          waited=0
+
+          while [ "$waited" -lt "$timeout_secs" ]; do
+            health_json="$(aws elbv2 describe-target-health --region "$AWS_REGION" --target-group-arn "$TARGET_TG_ARN" --output json)"
+            total="$(printf '%s' "$health_json" | jq '.TargetHealthDescriptions | length')"
+            healthy="$(printf '%s' "$health_json" | jq '[.TargetHealthDescriptions[] | select(.TargetHealth.State=="healthy")] | length')"
+
+            if [ "$total" -gt 0 ] && [ "$healthy" -eq "$total" ]; then
+              echo "Target group healthy: $healthy/$total"
+              exit 0
+            fi
+
+            echo "Waiting target group healthy: $healthy/$total"
+            sleep "$sleep_secs"
+            waited=$((waited + sleep_secs))
+          done
+
+          echo "Timed out waiting for target group health"
+          echo "$health_json"
+          exit 1
+          EOF
+
+          if [ "$DEPLOY_TARGET" = "blue" ]; then
+            BLUE_WEIGHT=100
+            GREEN_WEIGHT=0
+          else
+            BLUE_WEIGHT=0
+            GREEN_WEIGHT=100
+          fi
+
+          ssh $SSH_OPTS -i /tmp/ec2_ssh_key "$EC2_USERNAME@$CONTROL_HOST" \
+            "AWS_REGION='$AWS_REGION' ALB_AUTH_RULE_ARN='$ALB_AUTH_RULE_ARN' TG_AUTH_BLUE_ARN='$TG_AUTH_BLUE_ARN' TG_AUTH_GREEN_ARN='$TG_AUTH_GREEN_ARN' BLUE_WEIGHT='$BLUE_WEIGHT' GREEN_WEIGHT='$GREEN_WEIGHT' bash -se" <<'EOF'
+          cat > /tmp/alb-actions-switch.json <<JSON
+          [{
+            "Type":"forward",
+            "ForwardConfig":{
+              "TargetGroups":[
+                {"TargetGroupArn":"${TG_AUTH_BLUE_ARN}","Weight":${BLUE_WEIGHT}},
+                {"TargetGroupArn":"${TG_AUTH_GREEN_ARN}","Weight":${GREEN_WEIGHT}}
+              ]
+            }
+          }]
+          JSON
+
+          aws elbv2 modify-rule \
+            --region "$AWS_REGION" \
+            --rule-arn "$ALB_AUTH_RULE_ARN" \
+            --actions file:///tmp/alb-actions-switch.json
+          EOF
+
+      - name: Smoke test production endpoint after switch
+        env:
+          SMOKE_URL: ${{ vars.PRODUCTION_SMOKE_URL || 'https://api.sushiikan.me/api/v1/users/me' }}
+          EXPECTED_STATUS: ${{ vars.PRODUCTION_SMOKE_EXPECTED_STATUS || '401' }}
+        run: |
+          set -euo pipefail
+          status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$SMOKE_URL")"
+          echo "Smoke URL: $SMOKE_URL"
+          echo "HTTP status: $status"
+          if [ "$status" != "$EXPECTED_STATUS" ]; then
+            echo "Unexpected smoke test status: expected $EXPECTED_STATUS, got $status"
+            exit 1
+          fi
+
+      - name: Roll back ALB traffic to original live color on failure
+        if: failure() && steps.route_plan.outputs.current_live != ''
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
+          CONTROL_HOST: ${{ secrets.EC2_BLUE_HOST }}
+          ALB_AUTH_RULE_ARN: ${{ vars.ALB_AUTH_RULE_ARN }}
+          TG_AUTH_BLUE_ARN: ${{ vars.TG_AUTH_BLUE_ARN }}
+          TG_AUTH_GREEN_ARN: ${{ vars.TG_AUTH_GREEN_ARN }}
+          CURRENT_LIVE: ${{ steps.route_plan.outputs.current_live }}
+        run: |
+          set -euo pipefail
+          if [ "$CURRENT_LIVE" = "blue" ]; then
+            BLUE_WEIGHT=100
+            GREEN_WEIGHT=0
+          else
+            BLUE_WEIGHT=0
+            GREEN_WEIGHT=100
+          fi
+
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+          ssh $SSH_OPTS -i /tmp/ec2_ssh_key "$EC2_USERNAME@$CONTROL_HOST" \
+            "AWS_REGION='$AWS_REGION' ALB_AUTH_RULE_ARN='$ALB_AUTH_RULE_ARN' TG_AUTH_BLUE_ARN='$TG_AUTH_BLUE_ARN' TG_AUTH_GREEN_ARN='$TG_AUTH_GREEN_ARN' BLUE_WEIGHT='$BLUE_WEIGHT' GREEN_WEIGHT='$GREEN_WEIGHT' bash -se" <<'EOF'
+          cat > /tmp/alb-actions-rollback.json <<JSON
+          [{
+            "Type":"forward",
+            "ForwardConfig":{
+              "TargetGroups":[
+                {"TargetGroupArn":"${TG_AUTH_BLUE_ARN}","Weight":${BLUE_WEIGHT}},
+                {"TargetGroupArn":"${TG_AUTH_GREEN_ARN}","Weight":${GREEN_WEIGHT}}
+              ]
+            }
+          }]
+          JSON
+
+          aws elbv2 modify-rule \
+            --region "$AWS_REGION" \
+            --rule-arn "$ALB_AUTH_RULE_ARN" \
+            --actions file:///tmp/alb-actions-rollback.json
+          EOF
