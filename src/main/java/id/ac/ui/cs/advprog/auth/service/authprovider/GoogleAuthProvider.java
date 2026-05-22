@@ -9,6 +9,7 @@ import id.ac.ui.cs.advprog.auth.repository.UserRepository;
 import id.ac.ui.cs.advprog.auth.service.oauth.OAuthClient;
 import id.ac.ui.cs.advprog.auth.service.utils.GoogleUserInfo;
 import id.ac.ui.cs.advprog.auth.service.utils.UsernameGenerator;
+import id.ac.ui.cs.advprog.auth.service.wallet.WalletProvisioningService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +22,7 @@ public class GoogleAuthProvider implements AuthProvider {
     private final UserRepository userRepository;
     private final OAuthClient oauthClient;
     private final UsernameGenerator usernameGenerator;
+    private final WalletProvisioningService walletProvisioningService;
 
     @Override
     public AuthProviderType getType() {
@@ -95,7 +97,9 @@ public class GoogleAuthProvider implements AuthProvider {
                 .isActive(true)
                 .build();
 
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        walletProvisioningService.provisionWallet(saved.getId());
+        return saved;
     }
 
     private UserRole resolveRequestedRole(String requestedRole, String mandorCertificationNumber) {
