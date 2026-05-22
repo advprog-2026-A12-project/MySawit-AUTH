@@ -70,7 +70,7 @@ class AuthServiceImplTest {
         AuthProviderFactory authProviderFactory = new DefaultAuthProviderFactory(
                 List.of(
                         new PasswordAuthProvider(userRepository, passwordEncoder),
-                        new GoogleAuthProvider(userRepository, oauthClient, usernameGenerator)
+                        new GoogleAuthProvider(userRepository, oauthClient, usernameGenerator, walletProvisioningService)
                 )
         );
 
@@ -418,7 +418,11 @@ class AuthServiceImplTest {
             when(userRepository.findByEmail("google.user@example.com"))
                     .thenReturn(Optional.empty());
             when(userRepository.existsByUsername(anyString())).thenReturn(false);
-            when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+                User u = inv.getArgument(0);
+                u.setId(UUID.randomUUID());
+                return u;
+            });
 
             when(jwtService.generateAccessToken(any(User.class))).thenReturn("access-jwt");
             when(jwtService.getAccessTokenExpiration()).thenReturn(21600L);
@@ -427,6 +431,7 @@ class AuthServiceImplTest {
 
             assertEquals("access-jwt", result.getAccessToken());
             verify(userRepository).save(any(User.class));
+            verify(walletProvisioningService).provisionWallet(any(UUID.class));
         }
 
         @Test
