@@ -302,6 +302,41 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$DEPLOY_TARGET" = "blue" ]; then
+            TARGET_TG_ARN="$TG_AUTH_BLUE_ARN"
+          else
+            TARGET_TG_ARN="$TG_AUTH_GREEN_ARN"
+          fi
+
+          # Wait until every registered target in destination TG is healthy.
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+          ssh $SSH_OPTS -i /tmp/ec2_ssh_key "$EC2_USERNAME@$CONTROL_HOST" \
+            "AWS_REGION='$AWS_REGION' TARGET_TG_ARN='$TARGET_TG_ARN' bash -se" <<'EOF'
+          set -euo pipefail
+          timeout_secs=300
+          sleep_secs=10
+          waited=0
+
+          while [ "$waited" -lt "$timeout_secs" ]; do
+            health_json="$(aws elbv2 describe-target-health --region "$AWS_REGION" --target-group-arn "$TARGET_TG_ARN" --output json)"
+            total="$(printf '%s' "$health_json" | jq '.TargetHealthDescriptions | length')"
+            healthy="$(printf '%s' "$health_json" | jq '[.TargetHealthDescriptions[] | select(.TargetHealth.State=="healthy")] | length')"
+
+            if [ "$total" -gt 0 ] && [ "$healthy" -eq "$total" ]; then
+              echo "Target group healthy: $healthy/$total"
+              exit 0
+            fi
+
+            echo "Waiting target group healthy: $healthy/$total"
+            sleep "$sleep_secs"
+            waited=$((waited + sleep_secs))
+          done
+
+          echo "Timed out waiting for target group health"
+          echo "$health_json"
+          exit 1
+          EOF
+
+          if [ "$DEPLOY_TARGET" = "blue" ]; then
             BLUE_WEIGHT=100
             GREEN_WEIGHT=0
           else
@@ -309,7 +344,6 @@ jobs:
             GREEN_WEIGHT=100
           fi
 
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
           ssh $SSH_OPTS -i /tmp/ec2_ssh_key "$EC2_USERNAME@$CONTROL_HOST" \
             "AWS_REGION='$AWS_REGION' ALB_AUTH_RULE_ARN='$ALB_AUTH_RULE_ARN' TG_AUTH_BLUE_ARN='$TG_AUTH_BLUE_ARN' TG_AUTH_GREEN_ARN='$TG_AUTH_GREEN_ARN' BLUE_WEIGHT='$BLUE_WEIGHT' GREEN_WEIGHT='$GREEN_WEIGHT' bash -se" <<'EOF'
           cat > /tmp/alb-actions-switch.json <<JSON
